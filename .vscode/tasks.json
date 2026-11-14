@@ -1,0 +1,12 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "build file",
+      "type": "process",
+      "command": "dotnet",
+      "args": ["build", "${file}", "-o", "${fileDirname}/out"],
+      "problemMatcher": "$msCompile"
+    }
+  ]
+}

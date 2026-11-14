@@ -1,0 +1,911 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IEnumerable&lt;T&gt; vs IEnumerator&lt;T&gt;, hands on</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #d9d5cb;
+    --seq: #1f7a8c; --cur: #b4531a; --acc: #6b3fa0; --soft: #ece8df; --code: #f1eee7;
+    --ok: #2c7a4b; --okbg: #e3f3e8; --bad: #b3261e; --badbg: #fbe6e4; --hl: #fff1c9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --panel: #1c2029; --ink: #e8eaf0; --muted: #9aa3b5; --line: #323848;
+      --seq: #4fb6c9; --cur: #f08a4b; --acc: #b48cf0; --soft: #262b37; --code: #171a21;
+      --ok: #6fcf97; --okbg: #17301f; --bad: #ff8a80; --badbg: #3a1b19; --hl: #3d3519;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 940px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 8px 0 10px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.3rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--muted); max-width: 70ch; }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 0.9em; }
+  pre { margin: 0 0 12px; background: var(--code); border-radius: 8px; padding: 10px 12px; overflow-x: auto;
+    font-size: 0.82rem; line-height: 1.55; }
+  pre .c { color: var(--muted); } pre .ok { color: var(--ok); font-weight: 600; } pre .no { color: var(--bad); font-weight: 600; }
+  .seqc { color: var(--seq); font-weight: 700; } .curc { color: var(--cur); font-weight: 700; }
+
+  nav { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  nav div { max-width: 940px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; }
+  nav a { flex: none; font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: 5px 11px;
+    border-radius: 999px; border: 1px solid transparent; }
+  nav a.on { color: var(--ink); border-color: var(--line); background: var(--panel); }
+
+  section { margin-top: 44px; }
+  .eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--acc); font-weight: 700; }
+  .sub { color: var(--muted); margin-bottom: 14px; }
+  .mentor { border-left: 4px solid var(--acc); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 14px; margin: 0 0 14px; }
+  .mentor b.who { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--acc); margin-bottom: 4px; }
+  .mentor p:last-child { margin-bottom: 0; }
+  .doc { font-size: 0.86rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 10px; }
+  .doc b { color: var(--ink); }
+
+  .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .rule { grid-template-columns: 1fr; } }
+  .rule > div { border-radius: 10px; padding: 12px 14px; color: var(--ink); border: 1px solid var(--line); border-left-width: 4px; }
+  .rule .s { background: color-mix(in srgb, var(--seq) 10%, var(--panel)); border-left-color: var(--seq); }
+  .rule .k { background: color-mix(in srgb, var(--cur) 10%, var(--panel)); border-left-color: var(--cur); }
+  .rule .s b { color: var(--seq); } .rule .k b { color: var(--cur); }
+  .rule b { font-size: 1.05rem; } .rule p { margin: 4px 0 0; font-size: 0.93rem; }
+
+  .w { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+  .w > h3 { display: flex; align-items: center; gap: 8px; }
+  .w > h3::before { content: "Try it"; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+    background: var(--acc); color: #fff; padding: 2px 7px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0; }
+  button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.84rem; }
+  button:focus-visible, dfn:focus-visible, summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { border: 0; border-radius: 0; background: transparent; font-size: 0.86rem; }
+  .seg button[aria-pressed="true"] { background: var(--acc); color: #fff; }
+
+  .verdict { border-radius: 8px; padding: 10px 12px; margin: 10px 0 0; font-size: 0.95rem; min-height: 2.8em; }
+  .verdict.ok { background: var(--okbg); border: 1px solid var(--ok); }
+  .verdict.bad { background: var(--badbg); border: 1px solid var(--bad); }
+  .verdict.idle { background: var(--soft); border: 1px solid transparent; color: var(--muted); }
+  .tag { display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; margin-right: 6px; color: #fff; }
+  .tag.ok { background: var(--ok); } .tag.bad { background: var(--bad); } .tag.seq { background: var(--seq); } .tag.cur { background: var(--cur); }
+
+  /* sequence strip with cursors */
+  .strip { display: flex; align-items: flex-end; gap: 6px; padding: 18px 6px 6px; position: relative; overflow-x: auto; }
+  .slot { flex: none; width: 74px; text-align: center; }
+  .slot .card { height: 48px; border-radius: 8px; background: var(--seq); color: #fff; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; transition: transform .3s, box-shadow .3s; }
+  .slot .card.edge { background: transparent; border: 2px dashed var(--line); color: var(--muted); font-weight: 400; font-size: 0.72rem; }
+  .slot small { display: block; font: 0.7rem ui-monospace, Consolas, monospace; color: var(--muted); margin-top: 3px; }
+  .slot .card.lit { transform: translateY(-6px); box-shadow: 0 0 0 3px var(--hl), 0 6px 14px rgba(0,0,0,.2); }
+  .slot.added .card { background: var(--acc); animation: drop .45s; }
+  @keyframes drop { from { transform: translateY(-26px) scale(.5); opacity: 0; } }
+
+  .cursor-row { display: grid; grid-template-columns: 54px 1fr; gap: 8px; align-items: center; border-top: 1px dashed var(--line); padding: 8px 0; }
+  .cursor-row .name { font: 700 0.9rem ui-monospace, Consolas, monospace; color: var(--cur); }
+  .pins { display: flex; gap: 6px; padding: 0 6px; overflow-x: auto; }
+  .pin { flex: none; width: 74px; height: 20px; position: relative; }
+  .pin.on::after { content: "▲"; position: absolute; left: 50%; transform: translateX(-50%); color: var(--cur); font-size: 1rem; line-height: 1; animation: pop .3s; }
+  @keyframes pop { from { transform: translate(-50%, 8px); opacity: 0; } }
+  .cbtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .cbtns button { font-size: 0.8rem; padding: 4px 9px; font-family: ui-monospace, Consolas, monospace; }
+  ul.log { list-style: none; margin: 8px 0 0; padding: 8px 10px; background: var(--code); border-radius: 8px;
+    font: 0.8rem/1.6 ui-monospace, Consolas, monospace; max-height: 180px; overflow-y: auto; min-height: 2.2em; }
+  ul.log li { animation: slide .3s; }
+  ul.log li.bad { color: var(--bad); } ul.log li.ok { color: var(--ok); }
+  ul.log li .who { display: inline-block; min-width: 5.5em; font-weight: 700; }
+  @keyframes slide { from { opacity: 0; transform: translateX(-8px); } }
+
+  /* side by side code */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
+  .pane { min-width: 0; }
+  .pane h4 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .lines { background: var(--code); border-radius: 8px; padding: 8px 0; font: 0.8rem/1.65 ui-monospace, Consolas, monospace; overflow-x: auto; }
+  .lines div { padding: 0 12px; white-space: pre; border-left: 3px solid transparent; transition: background .2s; }
+  .lines div.on { background: var(--hl); border-left-color: var(--acc); }
+  .lines div.caller.on { border-left-color: var(--seq); }
+  .lines div.iter.on { border-left-color: var(--cur); }
+  .state { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.86rem; margin-top: 10px; }
+  .state span b { font-family: ui-monospace, Consolas, monospace; }
+
+  /* sorter */
+  .sorter { display: grid; gap: 8px; }
+  .srow { display: grid; grid-template-columns: minmax(0, 1.3fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; transition: border-color .3s, background .3s; }
+  .srow code { font-size: 0.82rem; overflow-wrap: anywhere; }
+  .srow.right { border-color: var(--ok); background: var(--okbg); }
+  .srow.wrong { border-color: var(--bad); background: var(--badbg); animation: shake .4s; }
+  .srow .why { grid-column: 1 / -1; font-size: 0.85rem; color: var(--muted); }
+  .srow .why:empty { display: none; }
+  @keyframes shake { 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+
+  /* variant simulator */
+  .runs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .run { font: 0.78rem ui-monospace, Consolas, monospace; border-radius: 6px; padding: 4px 8px; background: var(--soft); animation: drop .3s; }
+  .run.t { background: var(--okbg); border: 1px solid var(--ok); }
+  .run.f { background: var(--soft); border: 1px solid var(--line); }
+  .run.x { background: var(--badbg); border: 1px solid var(--bad); }
+
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details > *:not(summary) { margin-top: 10px; }
+  .views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .views { grid-template-columns: 1fr; } }
+  .view { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .view h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .view p:last-child { margin-bottom: 0; }
+
+  .q { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+  .q .prompt { font-weight: 600; margin-bottom: 8px; }
+  .q pre { margin-bottom: 10px; }
+  .q .opts { display: grid; gap: 6px; }
+  .q .opts button { text-align: left; }
+  .q .opts button.right { border-color: var(--ok); background: var(--okbg); }
+  .q .opts button.wrong { border-color: var(--bad); background: var(--badbg); }
+  .q .fb { margin-top: 10px; font-size: 0.93rem; }
+  .score { font-weight: 700; }
+  ol.check { padding-left: 22px; } ol.check li { margin-bottom: 10px; }
+  ol.check details { margin: 6px 0 0; padding: 6px 10px; }
+
+  dfn { font-style: normal; border-bottom: 2px dotted var(--acc); cursor: help; }
+  #tip { position: absolute; left: 0; top: 0; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--bg);
+    font-size: 0.85rem; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; opacity: 0; transition: opacity .15s; }
+  #tip.show { opacity: 1; } #tip b { display: block; margin-bottom: 2px; }
+  .src { --bw: min(1560px, calc(100vw - 48px)); display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 10px; }
+  @media (min-width: 1100px) {
+    .src { width: var(--bw); margin-left: calc((100% - var(--bw)) / 2); grid-template-columns: minmax(0, 1fr) minmax(300px, 0.85fr) minmax(0, 1fr); align-items: start; }
+    .notes-pane { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow-y: auto; }
+    .src .srclines div .tx { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .src ol.notes li { font-size: 0.86rem; padding: 7px 9px; }
+  }
+  .notes-pane ol.notes { margin-top: 0; }
+  .srclines div { position: relative; padding-left: 34px; display: flex; }
+  .srclines div .ind { white-space: pre; flex: none; }
+  .srclines div .tx { white-space: pre; flex: 1; min-width: 0; }
+  .srclines div.cm { color: var(--muted); }
+  .srclines div[data-n] { cursor: pointer; }
+  .srclines div[data-n]::after { content: attr(data-n); position: absolute; left: 8px; top: 2px; font: 700 0.66rem system-ui, sans-serif;
+    background: var(--acc); color: #fff; border-radius: 999px; min-width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .srclines div.on { background: var(--hl); border-left-color: var(--acc); }
+  ol.notes { margin: 12px 0 0; padding-left: 0; list-style: none; display: grid; gap: 6px; counter-reset: n; }
+  ol.notes li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); font-size: 0.92rem; transition: border-color .2s, background .2s; cursor: pointer; }
+  ol.notes li::before { counter-increment: n; content: counter(n); font: 700 0.75rem system-ui, sans-serif; background: var(--acc); color: #fff;
+    border-radius: 999px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+  ol.notes li.on { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, var(--panel)); }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+  footer a { color: inherit; } footer li { margin-bottom: 4px; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+</style>
+</head>
+<body>
+<nav><div id="nav">
+  <a href="#s0">Two roles</a><a href="#s1">1 · Cursors</a><a href="#s2">2 · foreach</a><a href="#s3">3 · States</a>
+  <a href="#s4">4 · Anatomy</a><a href="#s5">5 · MoveNext</a><a href="#s6">6 · yield</a><a href="#s7">Pitfalls</a><a href="#s8">Quiz</a><a href="#s9">Your turn</a>
+</div></nav>
+
+<main>
+<p class="eyebrow">Based on Microsoft's .NET API reference and C# language reference</p>
+<h1>IEnumerable&lt;T&gt; vs IEnumerator&lt;T&gt;, hands on</h1>
+<p class="lead">Each chapter explains one idea, then lets you operate it. The examples use a <code>Playlist</code> of songs so nothing here maps
+  one-to-one onto your task. Words with a dotted underline have a definition: hover, tap or focus them. The page ends with a quiz and a checklist,
+  not a solution.</p>
+
+<!-- ============ 0 ============ -->
+<section id="s0">
+  <p class="eyebrow">The idea</p>
+  <h2>A book and a bookmark</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Think of a book and a bookmark. The book holds the pages but has no idea which page anyone is reading. The bookmark knows exactly one thing:
+    where <em>this</em> reader is. Two people can read the same book at once, each with their own bookmark, without disturbing each other.</p>
+    <p>In .NET the book is <code>IEnumerable&lt;T&gt;</code> and the bookmark is <code>IEnumerator&lt;T&gt;</code>. The only thing a book can do in this
+    analogy is hand out a fresh bookmark, and that is its single method, <code>GetEnumerator()</code>.</p>
+  </div>
+  <div class="rule">
+    <div class="s"><b>IEnumerable&lt;T&gt;: the sequence</b>
+      <p>Microsoft describes it as the interface that exposes the enumerator. It has exactly one method to implement, <code>GetEnumerator()</code>,
+      which returns an <code>IEnumerator&lt;T&gt;</code>. It holds no position.</p></div>
+    <div class="k"><b>IEnumerator&lt;T&gt;: the cursor</b>
+      <p>It supports a simple iteration over a generic collection. It holds the position and has <code>Current</code>, <code>MoveNext()</code>,
+      <code>Reset()</code> and <code>Dispose()</code>.</p></div>
+  </div>
+  <p>One sentence to remember: <b>you <code>foreach</code> over an <dfn data-k="enumerable">enumerable</dfn>; the <dfn data-k="enumerator">enumerator</dfn>
+  is what does the walking.</b></p>
+
+  <h3 style="margin-top:22px">The real declarations, from the .NET source</h3>
+  <p class="sub">Copied from <code>System.Private.CoreLib</code>. I removed the license header, the Mono-only block and the <code>[Intrinsic]</code> attributes, which are hints
+    for the runtime and change nothing about how you use the interfaces. Hover or tap a numbered line.</p>
+  <div class="src">
+    <div class="pane"><h4><span class="seqc">IEnumerable.cs</span></h4><div class="lines srclines" data-for="srcA"></div></div>
+    <div class="pane notes-pane"><h4>What the numbers mean</h4><ol class="notes" id="srcNotes"></ol></div>
+    <div class="pane"><h4><span class="curc">IEnumerator.cs</span></h4><div class="lines srclines" data-for="srcB"></div></div>
+  </div>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <p class="eyebrow">Chapter 1 · one sequence, many cursors</p>
+  <h2>Hand out bookmarks and move them independently</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Every call to <code>GetEnumerator()</code> creates a new cursor that starts before the first element. Moving one cursor never moves another.
+    That is why two nested <code>foreach</code> loops over the same list work: each loop asked for its own enumerator.</p>
+  </div>
+  <div class="w" id="w1">
+    <h3>Create up to three enumerators over the same playlist</h3>
+<pre>var playlist = new Playlist { "Intro", "Verse", "Chorus", "Outro" };   <span class="c">// IEnumerable&lt;string&gt;</span></pre>
+    <div class="strip" id="w1strip"></div>
+    <div id="w1cursors"></div>
+    <div class="row">
+      <button class="primary mono" id="w1new">var e = playlist.GetEnumerator();</button>
+      <button id="w1reset">Reset all</button>
+    </div>
+    <ul class="log" id="w1log"></ul>
+  </div>
+  <p class="doc"><b>Docs:</b> a new enumerator is positioned before the first element, and <code>Current</code> is undefined there, so <code>MoveNext</code>
+  must be called before reading <code>Current</code>. The enumerator has no exclusive access to the collection.</p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <p class="eyebrow">Chapter 2 · what foreach really is</p>
+  <h2>foreach is the enumerator loop, written for you</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>You've written <code>foreach</code> a hundred times, but you've never seen an enumerator in it. The compiler expands it into a
+    <code>GetEnumerator()</code> call, a <code>while (MoveNext())</code> loop that reads <code>Current</code>, and a <code>finally</code> that calls
+    <code>Dispose()</code>. Step through both versions side by side and watch them do exactly the same thing.</p>
+  </div>
+  <div class="w" id="w2">
+    <h3>Step through both loops</h3>
+    <div class="pair">
+      <div class="pane"><h4>What you write</h4><div class="lines" id="w2a"></div></div>
+      <div class="pane"><h4>Roughly what the compiler produces</h4><div class="lines" id="w2b"></div></div>
+    </div>
+    <div class="state" id="w2state"></div>
+    <div class="row"><button id="w2back">Back</button><button class="primary" id="w2next">Next step</button><button id="w2play">Play</button><button id="w2reset">Reset</button></div>
+    <div class="verdict idle" id="w2v"></div>
+    <ul class="log" id="w2out"></ul>
+  </div>
+  <p class="doc"><b>Docs:</b> <code>foreach</code> works on any type that implements <code>IEnumerable</code> or <code>IEnumerable&lt;T&gt;</code>. It also
+  works on any type with a public parameterless <code>GetEnumerator</code> whose return type has a public <code>Current</code> property and a public parameterless
+  <code>MoveNext</code> returning <code>bool</code>, without implementing the interfaces. Microsoft recommends <code>foreach</code> over manipulating the enumerator directly.</p>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <p class="eyebrow">Chapter 3 · the cursor's life</p>
+  <h2>Before, on, after: what each call returns</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>A cursor is a little <dfn data-k="statemachine">state machine</dfn>. Most exam questions about enumerators are really questions about these states:
+    what does <code>MoveNext()</code> return here, is <code>Current</code> valid there, what happens if the list changes in the middle.
+    This simulator follows the documented behaviour of <code>List&lt;T&gt;</code>'s enumerator.</p>
+  </div>
+  <div class="w" id="w3">
+    <h3>Drive a List&lt;string&gt; enumerator by hand</h3>
+<pre>var list = new List&lt;string&gt; { "A", "B", "C" };
+IEnumerator&lt;string&gt; e = list.GetEnumerator();</pre>
+    <div class="strip" id="w3strip"></div>
+    <div class="pins" id="w3pins"></div>
+    <div class="row">
+      <button class="mono" id="w3move">e.MoveNext()</button>
+      <button class="mono" id="w3cur">e.Current</button>
+      <button class="mono" id="w3resetE">((IEnumerator)e).Reset()</button>
+      <button class="mono" id="w3add">list.Add("D")</button>
+      <button id="w3new">New list and enumerator</button>
+    </div>
+    <div class="state" id="w3state"></div>
+    <ul class="log" id="w3log"></ul>
+  </div>
+  <details><summary>The rules this simulator follows, from the docs</summary>
+    <ul>
+      <li>Initially the enumerator is before the first element; <code>Current</code> is undefined there.</li>
+      <li><code>Current</code> returns the same object until <code>MoveNext</code> is called; <code>MoveNext</code> sets <code>Current</code> to the next element.</li>
+      <li>Past the end, <code>MoveNext</code> returns <code>false</code>, and keeps returning <code>false</code>. <code>Current</code> is undefined there too.</li>
+      <li>For <code>List&lt;T&gt;</code>: if the collection is changed, the enumerator is irrecoverably invalidated and the next <code>MoveNext</code> or <code>Reset</code>
+      throws <code>InvalidOperationException</code>.</li>
+      <li><code>Reset</code> exists for COM interoperability. <code>List&lt;T&gt;</code>'s enumerator implements it explicitly, so you need a cast to the non-generic
+      <code>IEnumerator</code> to call it. Other enumerators may simply throw <code>NotSupportedException</code>.</li>
+    </ul>
+    <p>"Undefined" means you must not rely on the value. The simulator shows what you'd typically see, but don't write code that depends on it.</p>
+  </details>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <p class="eyebrow">Chapter 4 · anatomy</p>
+  <h2>Which member belongs to which interface?</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>When you implement these by hand, the hardest part is keeping straight which member goes on which class. The sequence class gets the
+    <code>GetEnumerator</code> methods. The cursor class gets everything to do with position. Both generic interfaces also drag in their older
+    non-generic parents, which is where the "explicit" members come from. Sort these and read the explanations.</p>
+  </div>
+  <div class="w" id="w4">
+    <h3>Sort the members</h3>
+    <div class="sorter" id="w4list"></div>
+    <div class="verdict idle" id="w4v">Pick a side for each member.</div>
+  </div>
+  <div class="views">
+    <div class="view"><h3>Why there are two Current properties</h3>
+      <p>Microsoft's notes to implementers: <code>MoveNext()</code> and <code>Reset()</code> don't depend on <code>T</code> and appear only on the non-generic
+      interface. <code>Current</code> appears on both with different return types. Implement the non-generic <code>Current</code> as an
+      <dfn data-k="explicit">explicit interface implementation</dfn>.</p></div>
+    <div class="view"><h3>Why there are two GetEnumerator methods</h3>
+      <p><code>IEnumerable&lt;T&gt;</code> derives from the non-generic <code>IEnumerable</code>, so both methods are required. Microsoft's samples implement the
+      non-generic one explicitly and have it call the generic one, to avoid a naming conflict.</p></div>
+  </div>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <p class="eyebrow">Chapter 5 · the heart of a hand-written cursor</p>
+  <h2>Spot the correct MoveNext</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>A hand-written enumerator over an array usually keeps an index field. Because a fresh enumerator sits <em>before</em> the first element, the index
+    starts at <code>-1</code>, and <code>MoveNext</code> advances it and reports whether it's still inside the array. Off-by-one mistakes here are classic
+    exam material. Pick a variant and run it over three songs.</p>
+  </div>
+  <div class="w" id="w5">
+    <h3>Run each variant over { "Intro", "Verse", "Chorus" }</h3>
+<pre id="w5code"></pre>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">Variant</span><div class="seg" id="w5pick"></div>
+      <span class="mono" style="font-size:.85rem;color:var(--muted)">start</span><div class="seg" id="w5start"></div></div>
+    <div class="row"><button class="primary" id="w5run">Run a foreach-style loop</button></div>
+    <div class="runs" id="w5runs"></div>
+    <div class="verdict idle" id="w5v">Choose a variant and a starting index, then run. Predict the result first.</div>
+  </div>
+  <p class="doc"><b>Docs:</b> Microsoft's own sample enumerators keep a position field initialised to <code>-1</code>, with the comment that enumerators are positioned before
+  the first element until the first <code>MoveNext()</code> call.</p>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <p class="eyebrow">Chapter 6 · let the compiler write the cursor</p>
+  <h2>yield return: an enumerator without a cursor class</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Writing a cursor class by hand is good for understanding, and sometimes a task asks for it. In everyday code you write an
+    <dfn data-k="iterator">iterator</dfn> instead: a method with <code>yield return</code>. The compiler generates the <code>Current</code>, <code>MoveNext</code> and
+    <code>Dispose</code> for you. The surprising part is <em>when</em> the method body runs. Step through Microsoft's own example and watch the two sides take turns.</p>
+  </div>
+  <div class="w" id="w6">
+    <h3>Who runs when?</h3>
+    <div class="row"><div class="seg" id="w6mode"></div></div>
+    <div class="pair">
+      <div class="pane"><h4>Caller</h4><div class="lines" id="w6a"></div></div>
+      <div class="pane"><h4 id="w6title">Iterator method</h4><div class="lines" id="w6b"></div></div>
+    </div>
+    <div class="row"><button id="w6back">Back</button><button class="primary" id="w6next">Next step</button><button id="w6reset">Reset</button></div>
+    <div class="verdict idle" id="w6v"></div>
+    <ul class="log" id="w6out"></ul>
+  </div>
+  <p class="doc"><b>Docs:</b> calling an iterator doesn't execute it immediately. When iteration starts, it runs until the first <code>yield return</code>, then is suspended and the
+  caller gets the value. Each later iteration resumes after that <code>yield return</code>. Iteration completes at the end of the method or at <code>yield break</code>.
+  The return type of an iterator can be <code>IEnumerable</code>, <code>IEnumerable&lt;T&gt;</code>, <code>IEnumerator</code> or <code>IEnumerator&lt;T&gt;</code>
+  (or the async variant). A <code>return</code> statement is a compile-time error inside an iterator block.</p>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <p class="eyebrow">Pitfalls</p>
+  <h2>Things that trip people up</h2>
+  <details><summary>Changing the collection inside foreach</summary>
+<pre>var list = new List&lt;string&gt; { "A", "B" };
+foreach (var s in list)
+{
+    list.Add(s + "!");      <span class="no">// next MoveNext throws InvalidOperationException</span>
+}</pre>
+    <p>For <code>List&lt;T&gt;</code>, any add, change or delete invalidates the enumerator, and its next <code>MoveNext</code> or <code>Reset</code> throws. The interface docs
+    describe the general case as undefined behaviour, so a hand-written enumerator may not throw; it may just give wrong results.</p></details>
+  <details><summary>Reading Current before the first MoveNext, or after the last</summary>
+    <p>Both positions have an undefined <code>Current</code>. Microsoft's sample enumerators throw <code>InvalidOperationException</code> there; <code>List&lt;T&gt;</code>'s enumerator does not
+    promise anything. Always check <code>MoveNext()</code>'s result first.</p></details>
+  <details><summary>Expecting an enumerator to start over</summary>
+    <p>Once <code>MoveNext</code> has returned <code>false</code>, you can't set <code>Current</code> to the first element again with the generic interface; create a new enumerator instead.
+    <code>Reset</code> may not be implemented. In practice: call <code>GetEnumerator()</code> again, or just <code>foreach</code> again.</p></details>
+  <details><summary>Forgetting Dispose in a manual loop</summary>
+    <p><code>IEnumerator&lt;T&gt;</code> inherits <code>IDisposable</code>. <code>foreach</code> disposes the enumerator for you in a <code>finally</code>; a manual <code>while (e.MoveNext())</code>
+    loop should do the same, most simply with <code>using var e = sequence.GetEnumerator();</code>.</p></details>
+  <details><summary>foreach over null</summary>
+    <p>Applying <code>foreach</code> to <code>null</code> throws <code>NullReferenceException</code>. An empty collection is fine: the body just doesn't run.</p></details>
+  <details><summary>Thinking an iterator ran when you called it</summary>
+<pre>var songs = LoadSongs();    <span class="c">// nothing inside LoadSongs has run yet</span>
+foreach (var s in songs) { } <span class="c">// now it runs, one yield at a time</span></pre>
+    <p>Side effects like logging, validation or exceptions inside an iterator happen during enumeration, not at the call.</p></details>
+  <details><summary>Where yield is not allowed</summary>
+    <p>Not in methods with <code>in</code>, <code>ref</code> or <code>out</code> parameters, not in lambdas or anonymous methods, and not in <code>catch</code> or <code>finally</code> blocks
+    or in a <code>try</code> that has a <code>catch</code>. A <code>try</code> with only a <code>finally</code> is fine.</p></details>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <p class="eyebrow">Check yourself</p>
+  <h2>Quiz</h2>
+  <p class="sub">Answer before clicking. <span class="score" id="score"></span></p>
+  <div id="quiz"></div>
+  <div class="row"><button id="qreset">Reset quiz</button></div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <p class="eyebrow">Your turn</p>
+  <h2>Before you write your own demonstration</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>No solution here, as agreed. Instead, these are the questions your code has to answer. If you can answer each one out loud, you can write it.
+    Each hint points to the chapter that covers it.</p>
+  </div>
+  <ol class="check">
+    <li>Which class is the sequence and which is the cursor, and what does each one store?
+      <details><summary>Hint</summary><p>Chapter 0 and 4. One stores the items; the other stores a reference to them plus a position.</p></details></li>
+    <li>What value does your cursor's position start at, and why?
+      <details><summary>Hint</summary><p>Chapter 5. Where is a fresh enumerator positioned?</p></details></li>
+    <li>What does your <code>MoveNext()</code> return on the call after the last element, and on every call after that?
+      <details><summary>Hint</summary><p>Chapter 3 and 5. Run the variants until you see the pattern.</p></details></li>
+    <li>Which members need an explicit interface implementation, and what should each one call?
+      <details><summary>Hint</summary><p>Chapter 4. There are two, one in each class.</p></details></li>
+    <li>In your manual loop, which three calls replace what <code>foreach</code> did, and who disposes the enumerator?
+      <details><summary>Hint</summary><p>Chapter 2. Step through the right-hand pane again.</p></details></li>
+    <li>If you print from both loops, what should the two outputs look like relative to each other, and what would it mean if they differed?
+      <details><summary>Hint</summary><p>Chapter 2. They are the same mechanism.</p></details></li>
+    <li>Can you show that two enumerators from the same sequence move independently?
+      <details><summary>Hint</summary><p>Chapter 1. A good demonstration often includes this.</p></details></li>
+    <li>Does your <code>Reset()</code> do something useful, or throw <code>NotSupportedException</code>? Either is allowed; can you justify your choice?
+      <details><summary>Hint</summary><p>Chapter 3's rules and the Pitfalls section.</p></details></li>
+  </ol>
+</section>
+
+<footer>
+  <p>Based on Microsoft Learn:</p>
+  <ul>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ienumerable-1?view=net-10.0">IEnumerable&lt;T&gt; Interface</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ienumerable-1.getenumerator?view=net-10.0">IEnumerable&lt;T&gt;.GetEnumerator</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.ienumerator-1?view=net-10.0">IEnumerator&lt;T&gt; Interface</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/api/system.collections.ienumerator?view=net-10.0">IEnumerator Interface</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/api/system.collections.generic.list-1.enumerator?view=net-8.0">List&lt;T&gt;.Enumerator Struct</a></li>
+    <li>.NET runtime source: <a href="https://source.dot.net/#System.Private.CoreLib/src/libraries/System.Private.CoreLib/src/System/Collections/Generic/IEnumerable.cs">IEnumerable.cs</a> and
+      <a href="https://source.dot.net/#System.Private.CoreLib/src/libraries/System.Private.CoreLib/src/System/Collections/Generic/IEnumerator.cs">IEnumerator.cs</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/iteration-statements">Iteration statements (foreach)</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/yield">yield statement</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/statements">C# specification: Statements</a></li>
+  </ul>
+  <p>The Playlist examples, explanations and interactive parts are original. The yield chapter reproduces the example from the yield statement page.</p>
+</footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  function verdict(n, kind, html) { n.className = 'verdict ' + kind; n.innerHTML = html; }
+  function seg(host, opts, value, on) {
+    host.innerHTML = '';
+    opts.forEach(o => { const b = el('button', '', esc(o.label)); b.type = 'button'; b.setAttribute('aria-pressed', String(o.value === value)); b.onclick = () => on(o.value); host.append(b); });
+  }
+  function log(ul, html, cls) { const li = el('li', cls || '', html); ul.append(li); ul.scrollTop = ul.scrollHeight; }
+  function strip(host, items, extra = {}) {
+    host.innerHTML = '';
+    const mk = (label, idx, edge, added) => {
+      const s = el('div', 'slot' + (added ? ' added' : ''));
+      s.append(el('div', 'card' + (edge ? ' edge' : ''), esc(label)), el('small', '', idx));
+      host.append(s); return s;
+    };
+    mk('before first', '', true);
+    items.forEach((t, i) => mk(t, `[${i}]`, false, extra.added === i));
+    mk('after last', '', true);
+  }
+
+  // ---------- glossary ----------
+  const G = {
+    enumerable: ['Enumerable', 'Anything you can foreach over. In .NET: a type implementing IEnumerable or IEnumerable<T>, which hands out enumerators.'],
+    enumerator: ['Enumerator', 'The object that walks a sequence. It remembers a position and exposes Current and MoveNext().'],
+    statemachine: ['State machine', 'An object whose behaviour depends on which state it is in. Here: before the first element, on an element, after the last, or invalidated.'],
+    explicit: ['Explicit interface implementation', 'A member written as InterfaceName.Member, for example object IEnumerator.Current. It can only be called through that interface, which avoids clashing with a public member of the same name.'],
+    iterator: ['Iterator', 'A method or get accessor containing yield return. The compiler turns it into an enumerator for you.'],
+    boxing: ['Boxing', 'Wrapping a value type, such as an int, in a new heap object so it can be treated as object.'],
+    lazy: ['Deferred execution', 'Work that is postponed until the result is actually requested, here until MoveNext() is called.']
+  };
+  const tip = $('#tip');
+  function showTip(d) {
+    const g = G[d.dataset.k]; if (!g) return;
+    tip.innerHTML = `<b>${esc(g[0])}</b>${esc(g[1])}`;
+    const r = d.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = r.left + scrollX + r.width / 2 - tw / 2;
+    x = Math.max(8 + scrollX, Math.min(x, scrollX + document.documentElement.clientWidth - tw - 8));
+    let y = r.top + scrollY - th - 8; if (r.top - th - 8 < 50) y = r.bottom + scrollY + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.classList.add('show');
+  }
+  const hideTip = () => { tip.classList.remove('show'); tip.style.left = '0px'; tip.style.top = '0px'; };
+  $$('dfn').forEach(d => { d.tabIndex = 0;
+    d.addEventListener('mouseenter', () => showTip(d)); d.addEventListener('mouseleave', hideTip);
+    d.addEventListener('focus', () => showTip(d)); d.addEventListener('blur', hideTip);
+    d.addEventListener('click', e => { e.stopPropagation(); showTip(d); }); });
+  document.addEventListener('click', hideTip); addEventListener('scroll', hideTip, { passive: true });
+
+  // ---------- nav ----------
+  const links = $$('#nav a');
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-45% 0px -50% 0px' });
+  $$('main section').forEach(s => io.observe(s));
+
+  // ---------- source declarations ----------
+  (() => {
+    const A = [
+      ['namespace System.Collections.Generic'], ['{'],
+      ['    // Implement this interface if you need to support foreach semantics.', 'cm'],
+      ['    public interface IEnumerable<out T> : IEnumerable', '', 1],
+      ['        where T : allows ref struct', '', 3],
+      ['    {'],
+      ['        // Returns an IEnumerator for this enumerable Object. The enumerator provides', 'cm'],
+      ['        // a simple way to access all the contents of a collection.', 'cm'],
+      ['        new IEnumerator<T> GetEnumerator();', '', 4],
+      ['    }'], ['}']
+    ];
+    const B = [
+      ['namespace System.Collections.Generic'], ['{'],
+      ['    // Base interface for all generic enumerators, providing a simple approach', 'cm'],
+      ['    // to iterating over a collection.', 'cm'],
+      ['    public interface IEnumerator<out T> : IDisposable, IEnumerator', '', 2],
+      ['        where T : allows ref struct', '', 3],
+      ['    {'],
+      ['        // Returns the current element of the enumeration. The returned value is', 'cm', 5],
+      ['        // undefined before the first call to MoveNext and following a', 'cm', 5],
+      ['        // call to MoveNext that returned false. Multiple calls to', 'cm', 5],
+      ['        // GetCurrent with no intervening calls to MoveNext', 'cm', 5],
+      ['        // will return the same object.', 'cm', 5],
+      ['        new T Current', '', 4],
+      ['        {'], ['            get;'], ['        }'],
+      ['        // NOTE: An implementation of an enumerator using a ref struct T will', 'cm', 6],
+      ['        // not be able to implement IEnumerator.Current to return that T (as', 'cm', 6],
+      ['        // doing so would require boxing). It should throw a NotSupportedException', 'cm', 6],
+      ['        // from that property implementation.', 'cm', 6],
+      ['    }'], ['}']
+    ];
+    const NOTES = [
+      `<span><b>The sequence is a one-method interface on top of an older one.</b> <code>: IEnumerable</code> means it inherits the non-generic
+        <code>IEnumerable</code>, which has its own <code>GetEnumerator()</code> returning a non-generic <code>IEnumerator</code>. That is why your class needs
+        two <code>GetEnumerator</code> methods (Chapter 4). The <code>out</code> on <code>T</code> is the covariance from the variance page: <code>IEnumerable&lt;Circle&gt;</code>
+        can be used as <code>IEnumerable&lt;Shape&gt;</code>.</span>`,
+      `<span><b>Notice what's missing: <code>MoveNext</code>, <code>Reset</code> and <code>Dispose</code> aren't declared here.</b> They're inherited.
+        <code>MoveNext()</code> and <code>Reset()</code> come from the non-generic <code>IEnumerator</code>, because they don't depend on <code>T</code>; <code>Dispose()</code>
+        comes from <code>IDisposable</code>, which is why <code>foreach</code> can dispose the enumerator. The only member this interface adds is the typed <code>Current</code>.</span>`,
+      `<span><b><code>allows ref struct</code></b> is a newer C# feature that lets <code>T</code> be a <code>ref struct</code> such as <code>Span&lt;int&gt;</code>. It widens what
+        <code>T</code> may be instead of restricting it. For exam purposes you can read past it: it changes nothing about how a normal collection implements these interfaces.</span>`,
+      `<span><b>The <code>new</code> modifier hides the inherited member with the same name.</b> The non-generic parent already has <code>GetEnumerator()</code> returning
+        <code>IEnumerator</code>, and <code>Current</code> returning <code>object</code>. The generic interface redeclares each one with a typed result. An implementing class
+        must provide both versions, which is where the explicit <code>IEnumerable.GetEnumerator()</code> and <code>object IEnumerator.Current</code> come from.</span>`,
+      `<span><b>This comment is the whole contract of <code>Current</code>.</b> Undefined before the first <code>MoveNext</code>, undefined after a <code>MoveNext</code> that
+        returned <code>false</code>, and stable between calls. It's exactly what you drive in Chapter 3. ("GetCurrent" is an old name for the <code>Current</code> getter.)</span>`,
+      `<span><b>The two <code>Current</code> properties can conflict.</b> The non-generic one returns <code>object</code>, so returning a value type through it means
+        <dfn data-k="boxing">boxing</dfn>. A <code>ref struct</code> can't be boxed at all, so such an enumerator is told to throw <code>NotSupportedException</code> from the
+        non-generic <code>Current</code>. For ordinary types, that property simply returns the generic <code>Current</code>.</span>`
+    ];
+    const notes = $('#srcNotes');
+    NOTES.forEach((h, k) => { const li = el('li', '', h); li.dataset.n = k + 1; notes.append(li); });
+    const fill = (host, lines) => lines.forEach(([t, cls, n]) => {
+      const lead = (t.match(/^ */) || [''])[0];
+      const d = el('div', cls || '', `<span class="ind">${lead}</span><span class="tx">${esc(t.slice(lead.length)) || ' '}</span>`);
+      if (n) d.dataset.n = n; host.append(d); });
+    fill($('[data-for="srcA"]'), A); fill($('[data-for="srcB"]'), B);
+    const light = n => {
+      $$('.srclines div[data-n], #srcNotes li').forEach(x => x.classList.toggle('on', n != null && x.dataset.n === String(n)));
+      const pane = $('.notes-pane'), li = n != null && $(`#srcNotes li[data-n="${n}"]`);
+      if (li && pane.scrollHeight > pane.clientHeight) {
+        const top = li.offsetTop - pane.offsetTop - 30;
+        if (li.offsetTop - pane.offsetTop < pane.scrollTop || li.offsetTop - pane.offsetTop + li.offsetHeight > pane.scrollTop + pane.clientHeight)
+          pane.scrollTo({ top, behavior: 'smooth' });
+      }
+    };
+    $$('.srclines div[data-n], #srcNotes li').forEach(x => {
+      x.addEventListener('mouseenter', () => light(x.dataset.n));
+      x.addEventListener('mouseleave', () => light(null));
+      x.addEventListener('click', e => { e.stopPropagation(); light(x.dataset.n); });
+    });
+    $$('#srcNotes dfn').forEach(d => { d.tabIndex = 0; d.onmouseenter = () => showTip(d); d.onmouseleave = hideTip; d.onfocus = () => showTip(d); d.onblur = hideTip; });
+  })();
+
+  // ---------- widget 1: many cursors ----------
+  (() => {
+    const SONGS = ['Intro', 'Verse', 'Chorus', 'Outro'];
+    const host = $('#w1cursors'), logUl = $('#w1log');
+    let cursors = [];
+    strip($('#w1strip'), SONGS);
+    function lit() {
+      const cards = $$('#w1strip .card');
+      cards.forEach(c => c.classList.remove('lit'));
+      cursors.forEach(c => { if (c.pos >= 0 && c.pos < SONGS.length) cards[c.pos + 1].classList.add('lit'); });
+    }
+    function drawCursor(c) {
+      c.row.querySelector('.pins').innerHTML = '';
+      for (let i = -1; i <= SONGS.length; i++) c.row.querySelector('.pins').append(el('div', 'pin' + (i === c.pos ? ' on' : '')));
+      lit();
+    }
+    function add() {
+      if (cursors.length >= 3) return;
+      const name = 'e' + (cursors.length + 1);
+      const row = el('div', 'cursor-row');
+      row.append(el('div', 'name', name));
+      const right = el('div');
+      right.append(el('div', 'pins'));
+      const btns = el('div', 'cbtns');
+      const bm = el('button', '', `${name}.MoveNext()`), bc = el('button', '', `${name}.Current`);
+      btns.append(bm, bc); right.append(btns); row.append(right); host.append(row);
+      const c = { name, pos: -1, row };
+      bm.onclick = () => {
+        if (c.pos < SONGS.length) c.pos++;
+        const ok = c.pos < SONGS.length;
+        log(logUl, `<span class="who">${name}</span>MoveNext() → <b>${ok}</b>${ok ? '' : '  (past the end; it stays false)'}`, ok ? 'ok' : '');
+        drawCursor(c);
+      };
+      bc.onclick = () => {
+        if (c.pos < 0) log(logUl, `<span class="who">${name}</span>Current → undefined: still before the first element. Call MoveNext() first.`, 'bad');
+        else if (c.pos >= SONGS.length) log(logUl, `<span class="who">${name}</span>Current → undefined: the enumerator is past the end.`, 'bad');
+        else log(logUl, `<span class="who">${name}</span>Current → "${SONGS[c.pos]}"`);
+      };
+      cursors.push(c); drawCursor(c);
+      log(logUl, `<span class="who">${name}</span>new enumerator created, positioned before the first element`);
+      if (cursors.length === 2) log(logUl, `<span class="who">tip</span>Move e2 and watch e1 stay where it is.`);
+      $('#w1new').disabled = cursors.length >= 3;
+    }
+    $('#w1new').onclick = add;
+    $('#w1reset').onclick = () => { cursors = []; host.innerHTML = ''; logUl.innerHTML = ''; lit(); $('#w1new').disabled = false; };
+  })();
+
+  // ---------- widget 2: foreach lowering ----------
+  (() => {
+    const SONGS = ['Intro', 'Verse', 'Chorus'];
+    const A = ['foreach (string song in playlist)', '{', '    Console.WriteLine(song);', '}'];
+    const B = ['IEnumerator<string> e = playlist.GetEnumerator();', 'try', '{', '    while (e.MoveNext())', '    {',
+      '        string song = e.Current;', '        Console.WriteLine(song);', '    }', '}', 'finally', '{', '    e.Dispose();', '}'];
+    const steps = [{ a: -1, b: -1, pos: null, say: 'Press Next step. Both panes will light up the line doing the same job.' }];
+    steps.push({ a: 0, b: 0, pos: -1, say: '<span class="tag seq">sequence</span><code>GetEnumerator()</code> asks the playlist for a fresh cursor. It starts before the first element.' });
+    SONGS.forEach((s, i) => {
+      steps.push({ a: 0, b: 3, pos: i, ret: true, say: `<span class="tag cur">cursor</span><code>MoveNext()</code> advances to index ${i} and returns <b>true</b>.` });
+      steps.push({ a: 0, b: 5, pos: i, say: `<span class="tag cur">cursor</span><code>Current</code> reads "${s}" into the loop variable.` });
+      steps.push({ a: 2, b: 6, pos: i, out: s, say: `The body runs with <code>song = "${s}"</code>.` });
+    });
+    steps.push({ a: 0, b: 3, pos: SONGS.length, ret: false, say: '<span class="tag cur">cursor</span><code>MoveNext()</code> moves past the end and returns <b>false</b>, so the loop stops.' });
+    steps.push({ a: 3, b: 11, pos: SONGS.length, ret: false, disposed: true, say: '<code>Dispose()</code> runs in a <code>finally</code>, so it happens even if the body throws or you <code>break</code> out early. <code>IEnumerator&lt;T&gt;</code> inherits <code>IDisposable</code> for exactly this.' });
+    let i = 0, timer = null;
+    const draw = (host, lines, on) => { host.innerHTML = ''; lines.forEach((t, k) => host.append(el('div', k === on ? 'on' : '', esc(t) || ' '))); };
+    function render() {
+      const s = steps[i];
+      draw($('#w2a'), A, s.a); draw($('#w2b'), B, s.b);
+      const pos = s.pos == null ? '—' : s.pos < 0 ? 'before first' : s.pos >= SONGS.length ? 'after last' : `[${s.pos}] "${SONGS[s.pos]}"`;
+      $('#w2state').innerHTML = `<span>position: <b>${pos}</b></span><span>last MoveNext(): <b>${s.ret == null ? '—' : s.ret}</b></span><span>disposed: <b>${!!s.disposed}</b></span>`;
+      verdict($('#w2v'), i ? 'ok' : 'idle', s.say);
+      const out = $('#w2out'); out.innerHTML = '';
+      steps.slice(0, i + 1).forEach(x => { if (x.out) log(out, x.out); });
+      $('#w2back').disabled = i === 0; $('#w2next').disabled = i === steps.length - 1;
+    }
+    const stop = () => { clearInterval(timer); timer = null; $('#w2play').textContent = 'Play'; };
+    $('#w2next').onclick = () => { stop(); i = Math.min(steps.length - 1, i + 1); render(); };
+    $('#w2back').onclick = () => { stop(); i = Math.max(0, i - 1); render(); };
+    $('#w2reset').onclick = () => { stop(); i = 0; render(); };
+    $('#w2play').onclick = () => {
+      if (timer) return stop();
+      if (i === steps.length - 1) i = 0;
+      $('#w2play').textContent = 'Pause';
+      timer = setInterval(() => { i++; render(); if (i >= steps.length - 1) stop(); }, 1100);
+    };
+    render();
+  })();
+
+  // ---------- widget 3: state machine ----------
+  (() => {
+    let items, pos, broken, added;
+    const logUl = $('#w3log');
+    function render() {
+      strip($('#w3strip'), items, { added });
+      const pins = $('#w3pins'); pins.innerHTML = '';
+      for (let k = -1; k <= items.length; k++) pins.append(el('div', 'pin' + (k === pos ? ' on' : '')));
+      const where = pos < 0 ? 'before first' : pos >= items.length ? 'after last' : `on [${pos}]`;
+      $('#w3state').innerHTML = `<span>state: <b>${broken ? 'invalidated' : where}</b></span><span>list.Count: <b>${items.length}</b></span>`;
+    }
+    function fresh() { items = ['A', 'B', 'C']; pos = -1; broken = false; added = -1; logUl.innerHTML = ''; render();
+      log(logUl, '<span class="who">new</span>enumerator created before the first element'); }
+    $('#w3move').onclick = () => {
+      if (broken) { log(logUl, '<span class="who">MoveNext</span>throws InvalidOperationException: the collection was modified after the enumerator was created.', 'bad'); return; }
+      if (pos < items.length) pos++;
+      const ok = pos < items.length;
+      log(logUl, `<span class="who">MoveNext</span>→ <b>${ok}</b>${ok ? '' : (pos === items.length ? '  (past the end; further calls also return false)' : '')}`, ok ? 'ok' : '');
+      render();
+    };
+    $('#w3cur').onclick = () => {
+      if (broken && pos >= 0 && pos < 3) { log(logUl, `<span class="who">Current</span>undefined after the collection changed. Don't rely on it.`, 'bad'); return; }
+      if (pos < 0) log(logUl, '<span class="who">Current</span>undefined: before the first element.', 'bad');
+      else if (pos >= items.length || broken) log(logUl, '<span class="who">Current</span>undefined: after the last element.', 'bad');
+      else log(logUl, `<span class="who">Current</span>→ "${items[pos]}"  (same value until the next MoveNext)`);
+    };
+    $('#w3resetE').onclick = () => {
+      if (broken) { log(logUl, '<span class="who">Reset</span>throws InvalidOperationException: the enumerator is irrecoverably invalidated.', 'bad'); return; }
+      pos = -1; render(); log(logUl, '<span class="who">Reset</span>back before the first element. Call MoveNext before reading Current.');
+    };
+    $('#w3add').onclick = () => {
+      if (items.length >= 6) return;
+      items.push(String.fromCharCode(65 + items.length)); added = items.length - 1; broken = true; render();
+      log(logUl, `<span class="who">list.Add</span>"${items[added]}" added. The enumerator is now invalidated; try MoveNext or Reset.`, 'bad');
+    };
+    $('#w3new').onclick = fresh;
+    fresh();
+  })();
+
+  // ---------- widget 4: sorter ----------
+  (() => {
+    const M = [
+      { code: 'IEnumerator<T> GetEnumerator()', side: 'seq', why: 'The single method of IEnumerable<T>. Each call returns a new cursor.' },
+      { code: 'IEnumerator IEnumerable.GetEnumerator()', side: 'seq', why: 'Required because IEnumerable<T> derives from non-generic IEnumerable. Implemented explicitly; it usually just calls the generic one.' },
+      { code: 'T Current { get; }', side: 'cur', why: 'The element at the cursor\'s position. It is the one generic member of IEnumerator<T>.' },
+      { code: 'object IEnumerator.Current { get; }', side: 'cur', why: 'The non-generic Current, required by IEnumerator. Microsoft says to implement it explicitly so consumers of the non-generic interface can use your enumerator.' },
+      { code: 'bool MoveNext()', side: 'cur', why: 'Advances the position. It comes from the non-generic IEnumerator, because it does not depend on T.' },
+      { code: 'void Reset()', side: 'cur', why: 'Back to before the first element. Also from non-generic IEnumerator; provided for COM interoperability and may throw NotSupportedException.' },
+      { code: 'void Dispose()', side: 'cur', why: 'Inherited from IDisposable, which IEnumerator<T> extends. foreach calls it when the loop ends.' }
+    ];
+    const host = $('#w4list'); let right = 0, done = 0;
+    function upd() { verdict($('#w4v'), done === M.length ? (right === M.length ? 'ok' : 'bad') : 'idle',
+      done === M.length ? `${right} of ${M.length} correct. ${right === M.length ? 'The sequence class only hands out cursors; everything about position lives in the cursor.' : 'Read the red explanations. Click an answered row again to clear it and retry.'}`
+      : `${done} of ${M.length} sorted.`); }
+    M.forEach(m => {
+      const r = el('div', 'srow'); r.append(el('code', '', esc(m.code)));
+      const s = el('div', 'seg'); const why = el('div', 'why');
+      [['seq', 'IEnumerable<T> side'], ['cur', 'IEnumerator<T> side']].forEach(([v, l]) => {
+        const b = el('button', '', esc(l)); b.onclick = () => {
+          if (r.dataset.done) { delete r.dataset.done; done--; if (r.classList.contains('right')) right--; r.classList.remove('right', 'wrong'); why.textContent = ''; $$('button', s).forEach(x => x.setAttribute('aria-pressed', 'false')); upd(); return; }
+          r.dataset.done = 1; done++; const ok = v === m.side; if (ok) right++;
+          r.classList.add(ok ? 'right' : 'wrong'); b.setAttribute('aria-pressed', 'true');
+          why.innerHTML = (ok ? '' : `<b>Belongs on the ${m.side === 'seq' ? 'IEnumerable<T>' : 'IEnumerator<T>'} side.</b> `.replace(/</g, '&lt;').replace(/>/g, '&gt;').replace('&lt;b&gt;', '<b>').replace('&lt;/b&gt;', '</b>')) + esc(m.why);
+          upd();
+        }; s.append(b);
+      });
+      r.append(s, why); host.append(r);
+    });
+    upd();
+  })();
+
+  // ---------- widget 5: MoveNext variants ----------
+  (() => {
+    const SONGS = ['Intro', 'Verse', 'Chorus'];
+    const V = {
+      A: { label: 'A', code: 'public bool MoveNext()\n{\n    _position++;\n    return _position < _songs.Length;\n}', step: p => { p++; return [p, p < SONGS.length]; } },
+      B: { label: 'B', code: 'public bool MoveNext()\n{\n    _position++;\n    return _position <= _songs.Length;\n}', step: p => { p++; return [p, p <= SONGS.length]; } },
+      C: { label: 'C', code: 'public bool MoveNext()\n{\n    if (_position < _songs.Length)\n    {\n        _position++;\n        return true;\n    }\n    return false;\n}',
+           step: p => { if (p < SONGS.length) return [p + 1, true]; return [p, false]; } }
+    };
+    let pick = 'A', start = -1;
+    const current = 'public string Current => _songs[_position];   // throws IndexOutOfRangeException if _position is out of range';
+    function render() {
+      seg($('#w5pick'), Object.keys(V).map(k => ({ value: k, label: V[k].label })), pick, v => { pick = v; render(); });
+      seg($('#w5start'), [{ value: -1, label: '_position = -1' }, { value: 0, label: '_position = 0' }], start, v => { start = v; render(); });
+      $('#w5code').innerHTML = esc(`private int _position = ${start};\n\n${V[pick].code}\n\n${current}`);
+      $('#w5runs').innerHTML = ''; verdict($('#w5v'), 'idle', 'Predict the output, then press Run.');
+    }
+    $('#w5run').onclick = async () => {
+      const runs = $('#w5runs'); runs.innerHTML = '';
+      let p = start, got = [], err = false;
+      for (let n = 0; n < 8; n++) {
+        const [np, ok] = V[pick].step(p); p = np;
+        if (!ok) { runs.append(el('div', 'run f', 'MoveNext → false')); break; }
+        await wait(220);
+        if (p < 0 || p >= SONGS.length) { runs.append(el('div', 'run x', `MoveNext → true, Current → IndexOutOfRangeException ([${p}])`)); err = true; break; }
+        runs.append(el('div', 'run t', `MoveNext → true, Current → "${SONGS[p]}"`)); got.push(SONGS[p]);
+      }
+      const correct = !err && got.join() === SONGS.join();
+      let why;
+      if (correct) why = 'All three songs, in order, then false. This is the shape Microsoft\'s sample enumerators use: start before the first element, advance, then report whether the new position is inside the array.';
+      else if (err) why = `It reported <b>true</b> for a position outside the array, so the loop read <code>Current</code> there and crashed. Look at what the comparison allows on the last call.`;
+      else why = `No crash, but the loop produced ${got.length ? got.map(g => `"${g}"`).join(', ') : 'nothing'} instead of all three songs. ${start === 0 ? 'The first MoveNext moved off index 0 before anyone read it: the cursor must start <em>before</em> the first element.' : ''}`;
+      verdict($('#w5v'), correct ? 'ok' : 'bad', (correct ? '<span class="tag ok">correct</span>' : '<span class="tag bad">bug</span>') + why);
+    };
+    render();
+  })();
+
+  // ---------- widget 6: yield interleaving ----------
+  (() => {
+    const CALLER = ['var numbers = ProduceEvenNumbers(5);', 'Console.WriteLine("Caller: about to iterate.");', 'foreach (int i in numbers)', '{',
+      '    Console.WriteLine($"Caller: {i}");', '}'];
+    const LAZY = ['IEnumerable<int> ProduceEvenNumbers(int upto)', '{', '    Console.WriteLine("Iterator: start.");', '    for (int i = 0; i <= upto; i += 2)', '    {',
+      '        Console.WriteLine($"Iterator: about to yield {i}");', '        yield return i;', '        Console.WriteLine($"Iterator: yielded {i}");', '    }', '    Console.WriteLine("Iterator: end.");', '}'];
+    const EAGER = ['IEnumerable<int> ProduceEvenNumbers(int upto)', '{', '    Console.WriteLine("Iterator: start.");', '    var result = new List<int>();',
+      '    for (int i = 0; i <= upto; i += 2)', '    {', '        Console.WriteLine($"Iterator: adding {i}");', '        result.Add(i);', '    }', '    Console.WriteLine("Iterator: end.");', '    return result;', '}'];
+    function lazySteps() {
+      const s = [{ c: -1, it: -1, say: 'Press Next step. Lines light up in whichever method is running at that moment.' },
+        { c: 0, it: -1, say: '<span class="tag seq">caller</span>The iterator is called, but <b>none of its body runs</b>. You only get an object that knows how to run it later. This is <dfn data-k="lazy">deferred execution</dfn>.' },
+        { c: 1, it: -1, out: ['Caller', 'about to iterate.'], say: 'The caller prints first, even though the iterator was "called" on the line before.' },
+        { c: 2, it: 2, out: ['Iterator', 'start.'], say: '<span class="tag cur">iterator</span>The first <code>MoveNext()</code> from the foreach finally starts the method body.' }];
+      [0, 2, 4].forEach(n => {
+        s.push({ c: 2, it: 5, out: ['Iterator', `about to yield ${n}`], say: `The loop reaches <code>yield return ${n}</code>.` });
+        s.push({ c: 4, it: 6, out: ['Caller', `${n}`], say: `<span class="tag seq">caller</span>The iterator is <b>suspended</b> at <code>yield return</code>; <code>MoveNext()</code> returned true and <code>Current</code> is ${n}. The caller's body runs.` });
+        s.push({ c: 2, it: 7, out: ['Iterator', `yielded ${n}`], say: '<span class="tag cur">iterator</span>The next <code>MoveNext()</code> resumes right after the <code>yield return</code>, with all local variables intact.' });
+      });
+      s.push({ c: 2, it: 9, out: ['Iterator', 'end.'], say: 'The loop is finished, the method reaches its end, and <code>MoveNext()</code> returns false.' });
+      s.push({ c: 5, it: -1, say: 'The foreach ends. Compare the output with the eager version to see the difference.' });
+      return s;
+    }
+    function eagerSteps() {
+      const s = [{ c: -1, it: -1, say: 'Same caller, but the method builds a List and returns it. No yield.' },
+        { c: 0, it: 2, out: ['Iterator', 'start.'], say: '<span class="tag cur">method</span>Without <code>yield</code> this is an ordinary method: it runs completely, right now.' }];
+      [0, 2, 4].forEach(n => s.push({ c: 0, it: 6, out: ['Iterator', `adding ${n}`], say: `Builds the whole list up front: ${n}.` }));
+      s.push({ c: 0, it: 9, out: ['Iterator', 'end.'], say: 'Done before the caller has printed anything.' });
+      s.push({ c: 1, it: -1, out: ['Caller', 'about to iterate.'], say: '<span class="tag seq">caller</span>Only now does the caller continue.' });
+      [0, 2, 4].forEach(n => s.push({ c: 4, it: -1, out: ['Caller', `${n}`], say: 'The foreach walks a ready-made List. The method is not involved any more.' }));
+      s.push({ c: 5, it: -1, say: 'All method output came first, all caller output after. With yield, the two were interleaved.' });
+      return s;
+    }
+    let mode = 'lazy', steps = lazySteps(), i = 0;
+    function draw(host, lines, on, cls) { host.innerHTML = ''; lines.forEach((t, k) => host.append(el('div', cls + (k === on ? ' on' : ''), esc(t) || ' '))); }
+    function render() {
+      seg($('#w6mode'), [{ value: 'lazy', label: 'With yield return (Microsoft\'s example)' }, { value: 'eager', label: 'Without yield: build a List' }], mode,
+        v => { mode = v; steps = v === 'lazy' ? lazySteps() : eagerSteps(); i = 0; render(); });
+      $('#w6title').textContent = mode === 'lazy' ? 'Iterator method' : 'Ordinary method';
+      const s = steps[i];
+      draw($('#w6a'), CALLER, s.c, 'caller'); draw($('#w6b'), mode === 'lazy' ? LAZY : EAGER, s.it, 'iter');
+      verdict($('#w6v'), i ? 'ok' : 'idle', s.say);
+      $$('#w6v dfn').forEach(d => { d.tabIndex = 0; d.onmouseenter = () => showTip(d); d.onmouseleave = hideTip; d.onfocus = () => showTip(d); d.onblur = hideTip; });
+      const out = $('#w6out'); out.innerHTML = '';
+      steps.slice(0, i + 1).forEach(x => { if (x.out) log(out, `<span class="who" style="color:var(--${x.out[0] === 'Caller' ? 'seq' : 'cur'})">${x.out[0]}:</span>${esc(x.out[1])}`); });
+      $('#w6back').disabled = i === 0; $('#w6next').disabled = i === steps.length - 1;
+    }
+    $('#w6next').onclick = () => { i = Math.min(steps.length - 1, i + 1); render(); };
+    $('#w6back').onclick = () => { i = Math.max(0, i - 1); render(); };
+    $('#w6reset').onclick = () => { i = 0; render(); };
+    render();
+  })();
+
+  // ---------- quiz ----------
+  (() => {
+    const Q = [
+      { p: 'Which interface has exactly one method that you must implement?', o: ['IEnumerable<T>', 'IEnumerator<T>', 'Both', 'Neither'], a: 0,
+        w: 'IEnumerable<T> contains a single method, GetEnumerator. IEnumerator<T> has Current, MoveNext, Reset and Dispose.' },
+      { p: 'What does this print?', code: 'var list = new List<int> { 1, 2, 3 };\nvar e = list.GetEnumerator();\ne.MoveNext();\ne.MoveNext();\nConsole.WriteLine(e.Current);',
+        o: ['1', '2', '3', 'It throws'], a: 1, w: 'Each MoveNext advances one element, starting from before the first. Two calls land on the second element.' },
+      { p: 'What does this print?', code: 'var list = new List<string> { "a", "b" };\nvar e1 = list.GetEnumerator();\nvar e2 = list.GetEnumerator();\ne1.MoveNext(); e1.MoveNext();\ne2.MoveNext();\nConsole.WriteLine(e1.Current + e2.Current);',
+        o: ['"ba"', '"bb"', '"ab"', 'It throws'], a: 0, w: 'Each GetEnumerator() call returns an independent cursor. e1 is on "b", e2 on "a".' },
+      { p: 'A list has 2 elements. You call MoveNext() four times. What do the four calls return?', o: ['true, true, false, false', 'true, true, false, throws', 'true, true, true, false', 'true, false, false, false'], a: 0,
+        w: 'Past the end, MoveNext returns false, and subsequent calls also return false.' },
+      { p: 'What happens?', code: 'var list = new List<int> { 1, 2, 3 };\nforeach (var n in list)\n{\n    if (n == 2) list.Remove(n);\n}',
+        o: ['Removes 2 and finishes normally', 'InvalidOperationException on the next MoveNext', 'IndexOutOfRangeException', 'Compile error'], a: 1,
+        w: 'Changing a List<T> invalidates its enumerators. The foreach\'s next MoveNext throws InvalidOperationException.' },
+      { p: 'What is printed first?', code: 'IEnumerable<int> Numbers()\n{\n    Console.WriteLine("A");\n    yield return 1;\n}\n\nvar seq = Numbers();\nConsole.WriteLine("B");\nforeach (var n in seq) Console.WriteLine(n);',
+        o: ['A', 'B', '1', 'Nothing; it does not compile'], a: 1, w: 'Calling an iterator does not run it. "B" prints, then the foreach starts the body: "A", then 1.' },
+      { p: 'Does this compile?', code: 'IEnumerable<int> Evens(int max)\n{\n    if (max < 0) return null;\n    for (int i = 0; i <= max; i += 2) yield return i;\n}',
+        o: ['Yes', 'No'], a: 1, w: 'A return statement is a compile-time error inside an iterator block. Use yield break to end early.' },
+      { p: 'Why does a class implementing IEnumerable<T> also need IEnumerator IEnumerable.GetEnumerator()?', o: ['Because IEnumerable<T> derives from the non-generic IEnumerable', 'Because foreach only calls the non-generic one', 'For COM interoperability', 'It does not need it'], a: 0,
+        w: 'IEnumerable<T> inherits IEnumerable, so its member must be implemented too. Microsoft\'s samples implement it explicitly and forward to the generic method.' },
+      { p: 'In a manual while (e.MoveNext()) loop, what does foreach do that you might forget?', o: ['Call Reset() at the end', 'Call Dispose() in a finally', 'Read Current before the first MoveNext', 'Lock the collection'], a: 1,
+        w: 'foreach calls Dispose in a finally. In manual code, using var e = seq.GetEnumerator(); does the same.' },
+      { p: 'Can a type be used in foreach without implementing IEnumerable or IEnumerable<T>?', o: ['No, never', 'Yes, if it has a public GetEnumerator() returning a type with public Current and bool MoveNext()', 'Only structs', 'Only with a cast'], a: 1,
+        w: 'The docs list exactly those conditions. Span<T> is the example Microsoft gives: it implements no interfaces but works in foreach.' },
+      { p: 'Your hand-written enumerator\'s Reset() throws NotSupportedException. Is that allowed?', o: ['Yes; Reset exists for COM interop and need not be implemented', 'No; foreach calls Reset', 'No; it breaks IDisposable', 'Only for non-generic enumerators'], a: 0,
+        w: 'The docs say Reset does not necessarily need to be implemented; throwing NotSupportedException is fine if no caller relies on it.' }
+    ];
+    const host = $('#quiz'); let right = 0, done = 0;
+    const score = () => $('#score').textContent = done ? `Score: ${right} of ${done} answered (${Q.length} total).` : '';
+    function build() {
+      host.innerHTML = ''; right = 0; done = 0; score();
+      Q.forEach((q, qi) => {
+        const box = el('div', 'q'); box.append(el('div', 'prompt', `${qi + 1}. ${esc(q.p)}`));
+        if (q.code) box.append(el('pre', '', esc(q.code)));
+        const opts = el('div', 'opts'), fb = el('div', 'fb');
+        q.o.forEach((t, k) => { const b = el('button', '', esc(t)); b.onclick = () => {
+          $$('button', opts).forEach(x => x.disabled = true);
+          const ok = k === q.a; done++; if (ok) right++;
+          b.classList.add(ok ? 'right' : 'wrong'); opts.children[q.a].classList.add('right');
+          fb.innerHTML = `<span class="tag ${ok ? 'ok' : 'bad'}">${ok ? 'Right' : 'Not quite'}</span>${esc(q.w)}`; score();
+        }; opts.append(b); });
+        box.append(opts, fb); host.append(box);
+      });
+    }
+    $('#qreset').onclick = build; build();
+  })();
+})();
+</script>
+</body>
+</html>

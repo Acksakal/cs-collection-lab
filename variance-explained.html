@@ -1,0 +1,1088 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Covariance and contravariance in C#, example by example</title>
+<style>
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #d9d5cb;
+    --out: #1f7a8c; --in: #b4531a; --acc: #6b3fa0; --soft: #ece8df; --code: #f1eee7;
+    --ok: #2c7a4b; --okbg: #e3f3e8; --bad: #b3261e; --badbg: #fbe6e4; --hl: #fff1c9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --panel: #1c2029; --ink: #e8eaf0; --muted: #9aa3b5; --line: #323848;
+      --out: #4fb6c9; --in: #f08a4b; --acc: #b48cf0; --soft: #262b37; --code: #171a21;
+      --ok: #6fcf97; --okbg: #17301f; --bad: #ff8a80; --badbg: #3a1b19; --hl: #3d3519;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 920px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 8px 0 10px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.3rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--muted); max-width: 68ch; }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 0.9em; }
+  pre { margin: 0 0 12px; background: var(--code); border-radius: 8px; padding: 10px 12px; overflow-x: auto;
+    font-size: 0.82rem; line-height: 1.55; }
+  pre .c { color: var(--muted); }
+  pre .ok { color: var(--ok); font-weight: 600; }
+  pre .no { color: var(--bad); font-weight: 600; }
+  .kout { color: var(--out); font-weight: 700; }
+  .kin { color: var(--in); font-weight: 700; }
+
+  nav { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  nav div { max-width: 920px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; }
+  nav a { flex: none; font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: 5px 11px;
+    border-radius: 999px; border: 1px solid transparent; }
+  nav a.on { color: var(--ink); border-color: var(--line); background: var(--panel); }
+
+  section { margin-top: 44px; }
+  .eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--acc); font-weight: 700; }
+  .sub { color: var(--muted); margin-bottom: 14px; }
+  .mentor { border-left: 4px solid var(--acc); background: var(--panel); border-radius: 0 10px 10px 0;
+    padding: 12px 14px; margin: 0 0 14px; }
+  .mentor b.who { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--acc); margin-bottom: 4px; }
+  .mentor p:last-child { margin-bottom: 0; }
+  .views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .views { grid-template-columns: 1fr; } }
+  .view { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .view h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .view p:last-child, .view pre:last-child { margin-bottom: 0; }
+
+  .w { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+  .w > h3 { display: flex; align-items: center; gap: 8px; }
+  .w > h3::before { content: "Try it"; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+    background: var(--acc); color: #fff; padding: 2px 7px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: 8px 0; }
+  .row > span.lbl { color: var(--muted); font-size: 0.9rem; min-width: 9.5em; }
+  button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button:focus-visible, dfn:focus-visible, summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { border: 0; border-radius: 0; background: transparent; font-family: ui-monospace, Consolas, monospace; font-size: 0.84rem; }
+  .seg button[aria-pressed="true"] { background: var(--acc); color: #fff; }
+  .slot { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; padding: 2px 8px; border-style: dashed; }
+  .slot.p { border-color: var(--in); color: var(--in); }
+  .slot.r { border-color: var(--out); color: var(--out); }
+
+  .verdict { border-radius: 8px; padding: 10px 12px; margin: 10px 0 0; font-size: 0.95rem; min-height: 2.8em; }
+  .verdict.ok { background: var(--okbg); border: 1px solid var(--ok); }
+  .verdict.bad { background: var(--badbg); border: 1px solid var(--bad); }
+  .verdict.idle { background: var(--soft); border: 1px solid transparent; color: var(--muted); }
+  .tag { display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; margin-right: 6px; }
+  .tag.ok { background: var(--ok); color: #fff; } .tag.bad { background: var(--bad); color: #fff; }
+  .tag.out { background: var(--out); color: #fff; } .tag.in { background: var(--in); color: #fff; }
+
+  /* shapes */
+  .sh { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px;
+    background: var(--out); color: #fff; font-size: 0.68rem; font-weight: 700; flex: none; }
+  .sh.Circle { border-radius: 50%; }
+  .sh.Square { border-radius: 5px; background: var(--in); }
+  .sh.Coin { border-radius: 50%; background: #b8860b; outline: 3px double #fff; outline-offset: -6px; }
+  .sh.Shape { border-radius: 12px 4px 12px 4px; background: var(--muted); }
+  .sh.null { background: transparent; color: var(--muted); border: 2px dashed var(--muted); border-radius: 6px; }
+
+  /* widget 1 */
+  .flow { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; }
+  @media (max-width: 640px) { .flow { grid-template-columns: 1fr; } }
+  .box { border: 2px solid var(--line); border-radius: 10px; padding: 10px; min-height: 120px; transition: border-color .3s, background .3s; }
+  .box h4 { margin: 0 0 8px; font: 600 0.8rem ui-monospace, Consolas, monospace; }
+  .box.bad { border-color: var(--bad); background: var(--badbg); animation: shake .45s; }
+  @keyframes shake { 25% { transform: translateX(-5px); } 50% { transform: translateX(5px); } 75% { transform: translateX(-3px); } }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; min-height: 44px; }
+  .lens { align-self: center; text-align: center; font-size: 0.78rem; color: var(--muted); border: 2px dashed var(--out);
+    border-radius: 50%; width: 84px; height: 84px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    margin: 0 auto; transition: transform .25s, background .25s; }
+  .lens b { color: var(--out); font-family: ui-monospace, Consolas, monospace; }
+  .lens.flash { transform: scale(1.12); background: var(--hl); }
+  .pulse { animation: pulse .55s; }
+  @keyframes pulse { 40% { transform: scale(1.25); box-shadow: 0 0 0 5px var(--hl); } }
+  .drop { animation: drop .5s; }
+  @keyframes drop { from { transform: translateY(-34px) scale(.5); opacity: 0; } }
+  ul.console { list-style: none; margin: 0; padding: 0; font: 0.8rem/1.6 ui-monospace, Consolas, monospace; }
+  ul.console li { animation: slide .35s; }
+  @keyframes slide { from { opacity: 0; transform: translateX(-10px); } }
+
+  /* track */
+  .track { position: relative; height: 56px; margin: 6px 0 0; }
+  .track::before { content: ""; position: absolute; left: 6%; right: 6%; top: 27px; border-top: 2px dashed var(--line); }
+  .track .sh { position: absolute; top: 8px; left: 4%; transition: left .6s ease, opacity .3s, transform .3s; }
+  .stations { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .station { border: 2px solid var(--line); border-radius: 8px; padding: 7px 8px; font: 0.78rem ui-monospace, Consolas, monospace;
+    text-align: center; transition: border-color .3s, background .3s; overflow-wrap: anywhere; }
+  .station small { display: block; font-family: system-ui, sans-serif; color: var(--muted); font-size: 0.72rem; }
+  .station.ok { border-color: var(--ok); background: var(--okbg); }
+  .station.bad { border-color: var(--bad); background: var(--badbg); animation: shake .45s; }
+
+  /* widget 3 */
+  .sorted { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; min-height: 110px; padding: 10px;
+    border: 2px solid var(--line); border-radius: 10px; }
+  .item { display: flex; flex-direction: column; align-items: center; gap: 4px; font: 0.7rem ui-monospace, Consolas, monospace; color: var(--muted); }
+  .sorted:empty::before { content: "The set is empty."; color: var(--muted); font-size: 0.9rem; align-self: center; }
+
+  /* widget 5 */
+  table.ladder { width: 100%; border-collapse: separate; border-spacing: 6px; table-layout: fixed; }
+  table.ladder th { font: 600 0.74rem ui-monospace, Consolas, monospace; padding: 4px; vertical-align: bottom; overflow-wrap: anywhere; }
+  table.ladder th small { display: block; font: 0.7rem system-ui, sans-serif; color: var(--muted); }
+  table.ladder td { height: 54px; border-radius: 8px; background: var(--soft); text-align: center; vertical-align: middle; }
+  table.ladder td.type { background: transparent; text-align: right; font: 600 0.8rem ui-monospace, Consolas, monospace; width: 74px; }
+  table.ladder td.type small { display: block; font: 0.68rem system-ui, sans-serif; color: var(--muted); }
+  .col-hidden { opacity: 0.15; }
+  .tok { display: inline-block; font-size: 0.72rem; font-weight: 700; color: #fff; padding: 2px 8px; border-radius: 999px; margin: 1px; animation: drop .45s; }
+  .tok.in { background: var(--in); } .tok.out { background: var(--out); }
+
+  /* widget 6 */
+  .codelines { background: var(--code); border-radius: 8px; padding: 8px 0; font: 0.84rem/1.7 ui-monospace, Consolas, monospace; }
+  .codelines div { padding: 0 12px; display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: baseline; }
+  .codelines div.err { background: var(--badbg); }
+  .codelines div.fine { background: var(--okbg); }
+  .codelines small { font-family: system-ui, sans-serif; font-size: 0.78rem; }
+  .codelines .err small { color: var(--bad); } .codelines .fine small { color: var(--ok); }
+
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details > *:not(summary) { margin-top: 10px; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  table.ref th, table.ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+  table.ref td:first-child { font-family: ui-monospace, Consolas, monospace; font-size: 0.82rem; }
+
+  .q { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+  .q pre { margin-bottom: 10px; }
+  .q .fb { margin-top: 10px; font-size: 0.93rem; }
+  .score { font-weight: 700; }
+
+  dfn { font-style: normal; border-bottom: 2px dotted var(--acc); cursor: help; }
+  #tip { position: absolute; left: 0; top: 0; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--bg); font-size: 0.85rem; line-height: 1.4;
+    padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; opacity: 0; transition: opacity .15s; }
+  #tip.show { opacity: 1; }
+  #tip b { display: block; margin-bottom: 2px; }
+  .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .rule { grid-template-columns: 1fr; } }
+  .rule > div { border-radius: 10px; padding: 12px 14px; color: #fff; }
+  .rule .o { background: var(--out); } .rule .i { background: var(--in); }
+  .rule b { font-size: 1.05rem; } .rule p { margin: 4px 0 0; font-size: 0.93rem; }
+  .misuse { display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 12px; }
+  .misuse:empty { display: none; }
+  .misuse > div { border-radius: 10px; padding: 10px 12px; border: 1px solid var(--line); min-width: 0; }
+  .misuse > div.good { border-color: var(--ok); }
+  .misuse > div.evil { border-color: var(--bad); }
+  .misuse h4 { margin: 0 0 4px; font-size: 0.9rem; }
+  .misuse p { font-size: 0.86rem; color: var(--muted); margin: 0 0 8px; }
+  .misuse pre { margin: 0; }
+  .misuse pre > span { display: block; min-height: 1.55em; }
+  .misuse pre .bang { background: var(--badbg); margin: 0 -12px; padding: 0 12px; }
+  .arr2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 10px 0; }
+  @media (max-width: 640px) { .arr2 { grid-template-columns: 1fr; } }
+  .arr2 > div { border: 2px solid var(--line); border-radius: 10px; padding: 10px; }
+  .arr2 h4 { margin: 0 0 4px; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .arr2 p { margin: 0 0 6px; font-weight: 700; }
+  .arr2 small { color: var(--muted); }
+  .cells { display: flex; gap: 8px; }
+  .cell { width: 54px; height: 54px; border-radius: 8px; background: var(--soft); display: flex; align-items: center; justify-content: center;
+    position: relative; transition: background .3s; }
+  .cell i { position: absolute; bottom: -16px; font: 0.68rem ui-monospace, Consolas, monospace; color: var(--muted); font-style: normal; }
+  .cell.next { outline: 2px dashed var(--acc); outline-offset: 2px; }
+  .cell.reject { background: var(--badbg); animation: shake .45s; }
+  .cells .sh { width: 40px; height: 40px; }
+  .bounce { animation: bounce .7s forwards; }
+  @keyframes bounce { 0% { transform: translateY(-30px); opacity: 0; } 40% { transform: none; opacity: 1; } 70% { transform: translateY(-6px) rotate(-8deg); }
+    100% { transform: translateY(-34px) rotate(20deg); opacity: 0; } }
+  ul.nut { margin: 0; padding-left: 20px; max-width: 78ch; }
+  ul.nut li { margin-bottom: 8px; }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+  footer a { color: inherit; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+</style>
+</head>
+<body>
+<nav><div id="nav">
+  <a href="#s0">The problem</a><a href="#s1">1 · Reading</a><a href="#s2">2 · Callbacks</a><a href="#s3">3 · Comparers</a>
+  <a href="#s4">4 · Func</a><a href="#s5">5 · Two steps</a><a href="#s6">6 · Your own</a><a href="#s6b">Arrays</a><a href="#s7">Limits</a><a href="#s8">Quiz</a>
+</div></nav>
+
+<main>
+<p class="eyebrow">Based on Microsoft's "Covariance and contravariance in generics"</p>
+<h1>Covariance and contravariance, example by example</h1>
+<p class="lead">Each chapter takes one example from the Microsoft page, states the problem a working developer had, and lets you
+  poke at it. Words with a dotted underline have a definition: hover, tap or focus them.</p>
+<p class="lead">The page calls its classes <code>Base</code> and <code>Derived</code>. Here <code>Base</code> is <code>Shape</code> and
+  <code>Derived</code> is <code>Circle</code>, with <code>Square</code> as a second derived class so we can show what goes wrong.</p>
+<div class="row" aria-label="Cast of types">
+  <span class="sh Shape">Shape</span><span>base class</span>
+  <span class="sh Circle">Circle</span><span>: Shape</span>
+  <span class="sh Square">Square</span><span>: Shape</span>
+  <span class="sh Coin">Coin</span><span>: Circle</span>
+</div>
+
+<!-- ============ 0 ============ -->
+<section id="s0">
+  <p class="eyebrow">The problem</p>
+  <h2>A Circle is a Shape. Is a box of Circles a box of Shapes?</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>You already rely on <dfn data-k="poly">polymorphism</dfn> daily: a method that wants a <code>Shape</code> happily takes a <code>Circle</code>.
+    The trouble starts when the type is wrapped in a generic. Is a <code>List&lt;Circle&gt;</code> acceptable where a <code>List&lt;Shape&gt;</code>
+    is wanted? What about an <code>Action&lt;Circle&gt;</code>? The answer isn't the same for every generic type, and
+    <dfn data-k="variance">variance</dfn> is the set of rules that decides it.</p>
+    <p>Everything on this page follows from one question: <b>does the generic type hand values out, take values in, or both?</b></p>
+  </div>
+  <div class="rule">
+    <div class="o"><b>out: values come out of it</b>
+      <p>A <code>Circle</code> coming out can always be treated as a <code>Shape</code>. So a source of circles can stand in for a source of shapes.
+      That is <b>covariance</b>: the conversion runs the same way as Circle → Shape.</p></div>
+    <div class="i"><b>in: values go into it</b>
+      <p>Something that accepts any <code>Shape</code> can certainly accept a <code>Circle</code>. So a consumer of shapes can stand in for a consumer of circles.
+      That is <b>contravariance</b>: the conversion runs the opposite way.</p></div>
+  </div>
+  <p>A type that does both, like <code>List&lt;T&gt;</code> with its <code>Add</code> and its indexer, gets neither. It is
+    <dfn data-k="invariant">invariant</dfn>, which is the default for every <dfn data-k="tparam">type parameter</dfn>.</p>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <p class="eyebrow">Example 1 · covariance</p>
+  <h2>Passing a List&lt;Circle&gt; to a method that reads shapes</h2>
+  <p class="sub">The page's <code>PrintBases(IEnumerable&lt;Base&gt;)</code> example.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>I wrote a helper that prints any sequence of shapes. You have a <code>List&lt;Circle&gt;</code> and want to print it. Before C# 4 that call
+    didn't compile, and people copied the list into a new <code>List&lt;Shape&gt;</code> just to make the compiler happy. All my method does is
+    read. Reading circles as shapes can't hurt anyone, so the language should allow it.</p>
+  </div>
+<pre>static void PrintShapes(IEnumerable&lt;Shape&gt; shapes)
+{
+    foreach (Shape s in shapes) Console.WriteLine(s);
+}
+
+List&lt;Circle&gt; circles = new() { new Circle(1), new Circle(2), new Circle(3) };
+PrintShapes(circles);                       <span class="ok">// compiles: no cast, no copy</span>
+IEnumerable&lt;Shape&gt; shapes = circles;        <span class="ok">// same conversion, as an assignment</span></pre>
+
+  <div class="w" id="w1">
+    <h3>Reading is safe. Writing is where it breaks.</h3>
+    <div class="flow">
+      <div class="box" id="w1src"><h4>List&lt;Circle&gt; circles</h4><div class="chips"></div></div>
+      <div class="lens" id="w1lens">seen as<b>Shape</b></div>
+      <div class="box" id="w1dst"><h4>PrintShapes(IEnumerable&lt;Shape&gt;)</h4><ul class="console"></ul></div>
+    </div>
+    <div class="row">
+      <button class="primary" id="w1read">Call PrintShapes(circles)</button>
+      <button id="w1write">Pretend List&lt;Shape&gt; = circles were allowed</button>
+      <button id="w1reset">Reset</button>
+    </div>
+    <div class="verdict idle" id="w1v">Press the first button to see why reading is harmless, then the second to see what the compiler is protecting you from.</div>
+  </div>
+
+  <div class="views">
+    <div class="view"><h3>If you write the API</h3>
+      <p>Ask for the weakest thing you need. A method that only loops should take <code>IEnumerable&lt;Shape&gt;</code>, not <code>List&lt;Shape&gt;</code>.
+      Because <code>IEnumerable&lt;<span class="kout">out</span> T&gt;</code> is <dfn data-k="cov">covariant</dfn>, callers with a list of any derived type can use it.</p></div>
+    <div class="view"><h3>If you call the API</h3>
+      <p>You pass your <code>List&lt;Circle&gt;</code> directly. Nothing is copied and nothing is cast: the method receives your list, viewed through
+      an interface that only lets it read.</p></div>
+  </div>
+  <p>Why it's safe: in <code>IEnumerable&lt;T&gt;</code> the <code>T</code> appears only in <dfn data-k="outpos">output positions</dfn>.
+  There is no <code>Add(T)</code> to misuse, so the trick in the second button can't even be written.</p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <p class="eyebrow">Example 2 · contravariance</p>
+  <h2>Reusing a general callback where a specific one is wanted</h2>
+  <p class="sub">The page's <code>Action&lt;Base&gt;</code> assigned to <code>Action&lt;Derived&gt;</code>.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Some API asks you for an <code>Action&lt;Circle&gt;</code>: "give me something to run for each circle". You already have a logger that works on
+    any <code>Shape</code>. It feels backwards to hand a shape-handler to something asking for a circle-handler, but think about who supplies the
+    argument. The API will only ever pass circles, and your logger copes with every shape. The page's own words for this are that it
+    "seems backward" yet is type-safe.</p>
+  </div>
+<pre>Action&lt;Shape&gt; log = s =&gt; Console.WriteLine(s.GetType().Name);
+Action&lt;Circle&gt; onCircle = log;      <span class="ok">// compiles: contravariance</span>
+onCircle(new Circle(1));            <span class="c">// log receives a Circle, which is a Shape</span></pre>
+
+  <div class="w" id="w2">
+    <h3>Who can handle what?</h3>
+    <div class="row"><span class="lbl">The handler you have</span><div class="seg" id="w2h"></div></div>
+    <div class="row"><span class="lbl">The delegate wanted</span><div class="seg" id="w2d"></div></div>
+    <div class="row"><span class="lbl">The caller passes a</span><div class="seg" id="w2o"></div></div>
+    <div class="track" id="w2track"></div>
+    <div class="stations">
+      <div class="station" id="w2s0"><small>caller</small><span></span></div>
+      <div class="station" id="w2s1"><small>delegate variable</small><span></span></div>
+      <div class="station" id="w2s2"><small>your handler</small><span></span></div>
+    </div>
+    <div class="row"><button class="primary" id="w2run">Invoke the delegate</button></div>
+    <div class="verdict idle" id="w2v"></div>
+  </div>
+
+  <div class="views">
+    <div class="view"><h3>If you write the API</h3>
+      <p>You declare the callback with <code><span class="kin">in</span></code>: <code>delegate void Action&lt;<span class="kin">in</span> T&gt;(T obj)</code>.
+      Your promise is "I will only pass a <code>T</code> in; I never get one back". That promise is what makes general handlers acceptable.</p></div>
+    <div class="view"><h3>If you call the API</h3>
+      <p>You write one handler for the base type and reuse it for every derived type's event or callback, instead of one wrapper lambda per type.</p></div>
+  </div>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <p class="eyebrow">Example 3 · contravariant interface</p>
+  <h2>One comparer for every kind of shape</h2>
+  <p class="sub">The page's <code>ShapeAreaComparer</code> passed to <code>SortedSet&lt;Circle&gt;</code>.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>I want sets of circles sorted by area, and later sets of squares sorted by area. Area is defined on <code>Shape</code>, so the comparison logic
+    is identical. Without contravariance I'd need <code>CircleAreaComparer</code>, <code>SquareAreaComparer</code> and so on, each a copy of the same three lines.
+    <code><dfn data-k="icomparer">IComparer</dfn>&lt;<span class="kin">in</span> T&gt;</code> lets one comparer written for <code>Shape</code> serve them all.</p>
+  </div>
+<pre>class ShapeAreaComparer : IComparer&lt;Shape&gt;
+{
+    public int Compare(Shape? a, Shape? b)
+    {
+        if (a == null) return b == null ? 0 : -1;        <span class="c">// nulls sort first</span>
+        return b == null ? 1 : a.Area.CompareTo(b.Area);
+    }
+}
+
+<span class="c">// The constructor wants IComparer&lt;Circle&gt;. We give it an IComparer&lt;Shape&gt;.</span>
+var byArea = new <dfn data-k="sortedset">SortedSet</dfn>&lt;Circle&gt;(new ShapeAreaComparer())
+    { new Circle(7.2), new Circle(100), null, new Circle(.01) };</pre>
+
+  <div class="w" id="w3">
+    <h3>Fill the set and watch the comparer work</h3>
+    <div class="row"><span class="lbl">Collection</span><div class="seg" id="w3k"></div></div>
+    <div class="row">
+      <button class="primary" id="w3page">Run the page's example</button>
+      <button id="w3rand">Add a random one</button>
+      <button id="w3null">Add null</button>
+      <button id="w3clear">Clear</button>
+    </div>
+    <div class="sorted" id="w3set"></div>
+    <div class="verdict idle" id="w3v">The same <code>ShapeAreaComparer</code> object is used whichever collection you choose.</div>
+  </div>
+
+  <div class="views">
+    <div class="view"><h3>If you write the API</h3>
+      <p><code>SortedSet&lt;T&gt;</code>'s author asks for <code>IComparer&lt;T&gt;</code> and never thinks about base classes. The <code><span class="kin">in</span></code>
+      on the interface does the work: a comparer only receives values, so one for a <dfn data-k="less">less derived</dfn> type is always good enough.</p></div>
+    <div class="view"><h3>If you call the API</h3>
+      <p>You write the comparer once against the type that owns the property you compare, here <code>Shape.Area</code>, and pass it to collections of any derived type.</p></div>
+  </div>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <p class="eyebrow">Example 4 · both at once</p>
+  <h2>Func&lt;in T, out TResult&gt;: narrow the input, widen the output</h2>
+  <p class="sub">The page's <code>Func&lt;Base, Derived&gt;</code> assigned to three other <code>Func</code> types.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>A <code>Func</code> has a parameter and a return value, so both rules apply to the same <dfn data-k="delegate">delegate</dfn>, each to its own
+    type parameter. Suppose I have a method that takes any <code>Shape</code> and returns a <code>Circle</code>. Any code that will only ever pass circles in,
+    or is satisfied with getting some <code>Shape</code> back, can use it as is.</p>
+  </div>
+<pre>static Circle MyMethod(Shape s) =&gt; s as Circle ?? new Circle(1);
+
+Func&lt;Shape, Circle&gt;  f1 = MyMethod;
+Func&lt;Shape, Shape&gt;   f2 = f1;    <span class="c">// return type widened      (out)</span>
+Func&lt;Circle, Circle&gt; f3 = f1;    <span class="c">// parameter type narrowed  (in)</span>
+Func&lt;Circle, Shape&gt;  f4 = f1;    <span class="c">// both</span></pre>
+
+  <div class="w" id="w4">
+    <h3>Assignment checker: click a type to change it</h3>
+    <p class="mono" style="font-size:.95rem; line-height:2.1">
+      Func&lt;<button class="slot p" data-s="a"></button>, <button class="slot r" data-s="b"></button>&gt; source = MyMethod;<br>
+      Func&lt;<button class="slot p" data-s="c"></button>, <button class="slot r" data-s="d"></button>&gt; target = source;
+    </p>
+    <div class="row">
+      <button id="w4p2">f2 from the page</button><button id="w4p3">f3</button><button id="w4p4">f4</button><button id="w4bad">Show me a failure</button>
+    </div>
+    <div class="verdict idle" id="w4in"></div>
+    <div class="verdict idle" id="w4out"></div>
+    <div class="verdict idle" id="w4v"></div>
+  </div>
+  <p>The rule to memorise: a conversion is allowed when the target's <b>parameter</b> is the same or <dfn data-k="more">more derived</dfn>, and the
+  target's <b>return type</b> is the same or less derived.</p>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <p class="eyebrow">Example 5 · two different mechanisms</p>
+  <h2>Binding a method, then converting the delegate</h2>
+  <p class="sub">The page's <code>Type1</code>, <code>Type2</code>, <code>Type3</code> example. Here: <code>Shape</code> ← <code>Circle</code> ← <code>Coin</code>.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Two separate features can relax types, and this example chains them. The first has existed since C# 2: when you create a delegate from a
+    <dfn data-k="mgroup">method group</dfn>, the method's signature doesn't have to match exactly. The second is the generic variance from the earlier
+    chapters, added in C# 4, which converts one delegate object to another delegate type.</p>
+  </div>
+<pre>static Coin MyMethod(Shape s) =&gt; s as Coin ?? new Coin();
+
+Func&lt;Circle, Circle&gt; f1 = MyMethod;   <span class="c">// step 1: method binding</span>
+Func&lt;Coin, Shape&gt;    f2 = f1;         <span class="c">// step 2: generic variance</span>
+Shape result = f2(new Coin());</pre>
+
+  <div class="w" id="w5">
+    <h3>Follow the two types along the inheritance ladder</h3>
+    <table class="ladder" id="w5t"></table>
+    <div class="row">
+      <button id="w5back">Back</button><button class="primary" id="w5next">Next step</button>
+    </div>
+    <div class="verdict idle" id="w5v"></div>
+  </div>
+  <p>The limit worth knowing: step 2 only works between types built from the same <dfn data-k="gdef">generic type definition</dfn>, here
+  <code>Func&lt;T, TResult&gt;</code>. Two delegate types you declared yourself with identical signatures do not convert to each other.</p>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <p class="eyebrow">Example 6 · the author's side</p>
+  <h2>Declaring your own variant interface</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>When you design a generic interface, you choose. Marking a type parameter <code><span class="kout">out</span></code> or
+    <code><span class="kin">in</span></code> gives your callers the conversions from the chapters above, and in exchange the compiler holds you to the
+    matching restriction. Flip the keyword and watch which members it rejects.</p>
+  </div>
+  <div class="w" id="w6">
+    <h3>Be the API author</h3>
+    <div class="row"><span class="lbl">Variance keyword</span><div class="seg" id="w6k"></div></div>
+    <div class="codelines" id="w6code"></div>
+    <div class="verdict idle" id="w6v"></div>
+    <div class="misuse" id="w6bad"></div>
+  </div>
+  <div class="views">
+    <div class="view"><h3>Rules for <span class="kout">out</span> T</h3>
+      <p>Allowed as a method's return type and a read-only property's type. Not allowed as a method parameter. The page also notes it can't be used as a
+      generic constraint on the interface's methods.</p></div>
+    <div class="view"><h3>Rules for <span class="kin">in</span> T</h3>
+      <p>Allowed as a method parameter type, and as a generic constraint on the interface's methods. Not allowed as a return type.</p></div>
+  </div>
+</section>
+
+<!-- ============ 6b ============ -->
+<section id="s6b">
+  <p class="eyebrow">The exception to the rules · arrays</p>
+  <h2>Array covariance: the old, unchecked kind</h2>
+  <p class="sub">Based on the C# language specification (§17.6, §12.24.2) and the C# programming guide.</p>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Everything so far was checked by the compiler: if a conversion could ever let a wrong type in, it was rejected. Arrays are the one place
+    where C# lets the dangerous conversion through anyway. Arrays have been covariant since the first version of .NET, long before generics and
+    <code>out</code>/<code>in</code> existed, and the behaviour was kept for compatibility. Microsoft's programming guide says it plainly: converting an
+    array of a more derived type to an array of a less derived type is allowed, <b>but this operation is not type safe</b>.</p>
+  </div>
+
+<pre><span class="c">// The specification's own example</span>
+string[] sa = new string[10];
+object[] oa = sa;               <span class="ok">// compiles: array covariance</span>
+oa[0] = null;                   <span class="ok">// OK</span>
+oa[1] = "Hello";                <span class="ok">// OK</span>
+oa[2] = new ArrayList();        <span class="no">// ArrayTypeMismatchException at run time</span></pre>
+
+  <div class="w" id="w7">
+    <h3>Store into a covariant array</h3>
+    <p class="mono" style="font-size:.9rem">Shape[] shapes = circles;   <span style="color:var(--muted)">// circles is really a Circle[3]</span></p>
+    <div class="row">
+      <span class="lbl">Store into shapes[i]</span>
+      <button data-v="Circle">new Circle()</button>
+      <button data-v="Coin">new Coin()</button>
+      <button data-v="Square">new Square()</button>
+      <button data-v="null">null</button>
+      <button id="w7reset">Reset</button>
+    </div>
+    <div class="arr2">
+      <div><h4>What the compiler sees</h4><p class="mono">Shape[] shapes</p><small>Any Shape looks storable, so every button compiles.</small></div>
+      <div><h4>What the object really is</h4><p class="mono">Circle[]</p><div class="cells" id="w7cells"></div></div>
+    </div>
+    <div class="verdict idle" id="w7v">Every store compiles. The runtime checks each one against the array's <b>actual</b> element type, Circle.</div>
+  </div>
+
+  <h3 style="margin-top:18px">In a nutshell</h3>
+  <ul class="nut">
+    <li><b>What it is.</b> For two reference types A and B, if a reference conversion exists from A to B, the same conversion exists from
+      <code>A[]</code> to <code>B[]</code>. So a <code>Circle[]</code> can be used as a <code>Shape[]</code>, and a <code>string[]</code> as an <code>object[]</code>.</li>
+    <li><b>Why it is unsafe.</b> Arrays allow writing, and the conversion only changes how the array is viewed, not what it really is. A variable typed
+      <code>Shape[]</code> may point to a <code>Circle[]</code>.</li>
+    <li><b>How .NET protects you.</b> Every assignment to an element of a reference-type array includes a run-time check that the value is null or
+      compatible with the array's actual element type. If not, <code>ArrayTypeMismatchException</code> is thrown. The error surfaces when the program runs, not when it compiles.</li>
+    <li><b>Not for value types.</b> Array covariance does not apply to arrays of value types: an <code>int[]</code> cannot be treated as an <code>object[]</code>.
+      That line is a compile error.</li>
+  </ul>
+
+  <h3 style="margin-top:18px">What to be careful about</h3>
+  <details><summary>Methods that write into an array parameter</summary>
+    <p>A method taking <code>object[]</code> may receive a <code>string[]</code>. The specification's example is a <code>Fill</code> method that writes a value into each element:
+    it works for matching arrays and throws <code>ArrayTypeMismatchException</code> on the first write when a boxed <code>int</code> is stored into a <code>string[]</code>.</p>
+<pre>static void Fill(object[] array, object value)
+{
+    for (int i = 0; i &lt; array.Length; i++) array[i] = value;
+}
+
+Fill(new string[3], "x");   <span class="ok">// fine</span>
+Fill(new string[3], 1);     <span class="no">// compiles, then ArrayTypeMismatchException</span></pre>
+    <p>If your method only reads, ask for <code>IEnumerable&lt;T&gt;</code> or <code>IReadOnlyList&lt;T&gt;</code>. Their covariance is checked at compile time and they have no setter to misuse.</p></details>
+  <details><summary>Passing an array element by ref</summary>
+    <p>Passing an element of a reference-type array as a <code>ref</code> or <code>out</code> argument triggers a run-time check that the array's element type is
+    identical to the parameter type. In the specification's example, <code>F(ref b[1])</code> throws because <code>b</code> is declared <code>object[]</code> but really holds a <code>string[]</code>.</p>
+<pre>static void F(ref object x) { }
+
+object[] a = new object[10];
+object[] b = new string[10];
+F(ref a[0]);   <span class="ok">// OK</span>
+F(ref b[1]);   <span class="no">// ArrayTypeMismatchException</span></pre></details>
+  <details><summary>Converting a covariant array to Span&lt;T&gt;</summary>
+    <p>A <code>Span&lt;T&gt;</code> allows writing, so creating one over a covariant array throws <code>ArrayTypeMismatchException</code>. Microsoft lists this as a breaking change in C# 14:
+    a <code>Span&lt;T&gt;</code> overload may now be chosen where C# 13 picked an <code>IEnumerable&lt;T&gt;</code> overload, and that call can crash with a covariant array.
+    The documented workarounds are calling <code>.AsEnumerable()</code> or offering a <code>ReadOnlySpan&lt;T&gt;</code> overload.</p>
+<pre>string[] s = { "a" };
+object[] o = s;              <span class="c">// array variance</span>
+
+C.R(o);                      <span class="no">// C# 14: picks R(Span&lt;T&gt;), crashes in the Span constructor</span>
+C.R(o.AsEnumerable());       <span class="ok">// workaround</span></pre></details>
+
+  <div class="views">
+    <div class="view"><h3>If you write the API</h3>
+      <p>Don't take <code>T[]</code> just to read it. A parameter typed <code>IReadOnlyList&lt;T&gt;</code> or <code>IEnumerable&lt;T&gt;</code> gives callers the same flexibility with compile-time safety.
+      If you must write into an array you were given, remember it may be an array of a more derived type.</p></div>
+    <div class="view"><h3>If you call the API</h3>
+      <p>Prefer passing an array whose declared type matches its real type. If an <code>ArrayTypeMismatchException</code> appears, look for a place where a derived array was
+      assigned to a base-typed variable or parameter.</p></div>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <p class="eyebrow">Limits</p>
+  <h2>Where variance stops</h2>
+  <details><summary>Only interfaces and delegates can be variant</summary>
+    <p>Classes and structs are always invariant. <code>List&lt;Circle&gt;</code> is never a <code>List&lt;Shape&gt;</code>; it converts to
+    <code>IEnumerable&lt;Shape&gt;</code> because of the interface, not the class.</p></details>
+  <details><summary>Only reference types take part</summary>
+    <p>With a <dfn data-k="vtype">value type</dfn> as the type argument, the parameter behaves as invariant.</p>
+<pre>IEnumerable&lt;object&gt; a = new List&lt;string&gt;();   <span class="ok">// fine: string is a reference type</span>
+IEnumerable&lt;object&gt; b = new List&lt;int&gt;();      <span class="no">// error: int is a value type</span></pre>
+    <p>An <code>int</code> would need <dfn data-k="boxing">boxing</dfn> to become an <code>object</code>, and a variance conversion never changes the data, only how it's viewed.</p></details>
+  <details><summary>Delegates combine only when their types match exactly</summary>
+    <p>Variance lets you assign an <code>Action&lt;Shape&gt;</code> to an <code>Action&lt;Circle&gt;</code> variable. It does not let you
+    <dfn data-k="combine">combine</dfn> the two into one multicast delegate, even though calling both with a circle would be safe.</p></details>
+  <details><summary>A type parameter can be one or the other, never both</summary>
+    <p>An interface can have several type parameters with different variance, as <code>Func&lt;in T, out TResult&gt;</code> does. A single parameter
+    that is both read and written must stay invariant.</p></details>
+  <details><summary>Covariant return types are a different feature</summary>
+    <p>Since C# 9, an overriding method may return a more derived type than the method it overrides. The name is similar, but it concerns
+    inheritance between classes, not conversions between generic types.</p></details>
+  <details><summary>Which built-in types are variant</summary>
+    <table class="ref">
+      <tr><th>Type</th><th>Variance</th></tr>
+      <tr><td>IEnumerable&lt;T&gt;, IEnumerator&lt;T&gt;</td><td><span class="tag out">out</span></td></tr>
+      <tr><td>IQueryable&lt;T&gt;, IOrderedQueryable&lt;T&gt;, IOrderedEnumerable&lt;T&gt;</td><td><span class="tag out">out</span></td></tr>
+      <tr><td>IGrouping&lt;TKey, TElement&gt;</td><td><span class="tag out">out</span></td></tr>
+      <tr><td>Func&lt;TResult&gt;</td><td><span class="tag out">out</span></td></tr>
+      <tr><td>IComparer&lt;T&gt;, IEqualityComparer&lt;T&gt;, IComparable&lt;T&gt;</td><td><span class="tag in">in</span></td></tr>
+      <tr><td>Action&lt;T&gt; … Action&lt;T1,…,T16&gt;</td><td><span class="tag in">in</span></td></tr>
+      <tr><td>Predicate&lt;T&gt;, Comparison&lt;T&gt;</td><td><span class="tag in">in</span></td></tr>
+      <tr><td>Func&lt;T, TResult&gt; … Func&lt;T1,…,T16, TResult&gt;</td><td><span class="tag in">in</span> parameters, <span class="tag out">out</span> result</td></tr>
+      <tr><td>Converter&lt;TInput, TOutput&gt;</td><td><span class="tag in">in</span> input, <span class="tag out">out</span> output</td></tr>
+    </table></details>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <p class="eyebrow">Check yourself</p>
+  <h2>Does it compile?</h2>
+  <p class="sub">Decide before you click. <span class="score" id="score"></span></p>
+  <div id="quiz"></div>
+</section>
+
+<footer>
+  Examples adapted from Microsoft Learn,
+  <a href="https://learn.microsoft.com/en-us/dotnet/standard/generics/covariance-and-contravariance">Covariance and contravariance in generics</a>.
+  The array covariance section is based on the
+  <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/arrays">C# specification: Arrays</a>,
+  <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/language-specification/expressions">C# specification: Expressions</a>,
+  <a href="https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/concepts/covariance-contravariance/">Covariance and Contravariance (C#)</a> and
+  <a href="https://learn.microsoft.com/en-us/dotnet/csharp/whats-new/breaking-changes/compiler%20breaking%20changes%20-%20dotnet%2010">C# compiler breaking changes since C# 13</a>.
+  Class names were changed from Base/Derived and Type1–3 to shapes; the explanations and interactive parts are original.
+</footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  const esc = s => s.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  // ---------- type model ----------
+  const PARENT = { Circle: 'Shape', Square: 'Shape', Coin: 'Circle' };
+  const isA = (x, y) => { while (x) { if (x === y) return true; x = PARENT[x]; } return false; };
+  const shape = (type, text) => el('span', 'sh ' + type, text ?? type);
+
+  function seg(host, options, value, onChange) {
+    host.innerHTML = '';
+    options.forEach(o => {
+      const b = el('button', '', esc(o.label));
+      b.type = 'button';
+      b.setAttribute('aria-pressed', String(o.value === value));
+      b.addEventListener('click', () => onChange(o.value));
+      host.append(b);
+    });
+  }
+  function verdict(node, kind, html) { node.className = 'verdict ' + kind; node.innerHTML = html; }
+  const OK = '<span class="tag ok">compiles</span>', NO = '<span class="tag bad">compile error</span>';
+
+  // ---------- glossary tooltips ----------
+  const G = {
+    poly: ['Polymorphism', 'Using an object of a derived class wherever its base class is expected.'],
+    variance: ['Variance', 'The rules for whether G<Circle> can be used as G<Shape>, the other way round, or not at all.'],
+    cov: ['Covariant', 'Converts in the same direction as the element types: G<Circle> to G<Shape>. Marked with the out keyword.'],
+    contra: ['Contravariant', 'Converts in the opposite direction: G<Shape> to G<Circle>. Marked with the in keyword.'],
+    invariant: ['Invariant', 'No conversion in either direction. G<Circle> and G<Shape> are unrelated types.'],
+    tparam: ['Type parameter', 'The placeholder in a generic declaration, such as the T in List<T>.'],
+    outpos: ['Output position', 'A place where a value leaves the type: a method return type or a read-only property.'],
+    inpos: ['Input position', 'A place where a value enters the type: a method parameter.'],
+    delegate: ['Delegate', 'A type that holds a reference to a method, so the method can be stored, passed around and called later.'],
+    icomparer: ['IComparer<T>', 'An object with one method, Compare(a, b), that says which of two values sorts first.'],
+    sortedset: ['SortedSet<T>', 'A collection that keeps its elements unique and in sorted order, using a comparer to decide the order.'],
+    less: ['Less derived', 'Closer to the base of the inheritance chain. Shape is less derived than Circle.'],
+    more: ['More derived', 'Further down the inheritance chain. Circle is more derived than Shape, and Coin more than Circle.'],
+    mgroup: ['Method group', 'A method name used without calling it, as in f = MyMethod. The compiler turns it into a delegate.'],
+    gdef: ['Generic type definition', 'The generic type before its type arguments are filled in, such as Func<T, TResult>. Func<Shape, Circle> is one type constructed from it.'],
+    vtype: ['Value type', 'A type whose variables hold the data directly, such as int, double, bool and every struct.'],
+    boxing: ['Boxing', 'Wrapping a value type in a new heap object so it can be treated as an object.'],
+    combine: ['Combining delegates', 'Joining two delegates with + so that a single call runs both methods.']
+  };
+  const tip = $('#tip');
+  function showTip(d) {
+    const g = G[d.dataset.k]; if (!g) return;
+    tip.innerHTML = `<b>${esc(g[0])}</b>${esc(g[1])}`;
+    const r = d.getBoundingClientRect();
+    tip.style.left = '0px'; tip.style.top = '0px';
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = r.left + window.scrollX + r.width / 2 - tw / 2;
+    x = Math.max(8 + window.scrollX, Math.min(x, window.scrollX + document.documentElement.clientWidth - tw - 8));
+    let y = r.top + window.scrollY - th - 8;
+    if (r.top - th - 8 < 50) y = r.bottom + window.scrollY + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+    tip.classList.add('show');
+  }
+  const hideTip = () => { tip.classList.remove('show'); tip.style.left = '0px'; tip.style.top = '0px'; };
+  $$('dfn').forEach(d => {
+    d.tabIndex = 0;
+    d.addEventListener('mouseenter', () => showTip(d));
+    d.addEventListener('mouseleave', hideTip);
+    d.addEventListener('focus', () => showTip(d));
+    d.addEventListener('blur', hideTip);
+    d.addEventListener('click', e => { e.stopPropagation(); showTip(d); });
+  });
+  document.addEventListener('click', hideTip);
+  window.addEventListener('scroll', hideTip, { passive: true });
+
+  // ---------- nav highlight ----------
+  const links = $$('#nav a');
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id));
+  }), { rootMargin: '-45% 0px -50% 0px' });
+  $$('main section').forEach(s => io.observe(s));
+
+  // ---------- widget 1: covariance ----------
+  (() => {
+    const src = $('#w1src'), chips = $('.chips', src), out = $('#w1dst .console'), lens = $('#w1lens'), v = $('#w1v');
+    let busy = false;
+    function reset() {
+      chips.innerHTML = ''; out.innerHTML = ''; src.classList.remove('bad');
+      [1, 2, 3].forEach(r => chips.append(shape('Circle', 'r=' + r)));
+      $('#w1src h4').textContent = 'List<Circle> circles';
+      verdict(v, 'idle', 'Press the first button to see why reading is harmless, then the second to see what the compiler is protecting you from.');
+    }
+    $('#w1read').addEventListener('click', async () => {
+      if (busy) return; busy = true; reset();
+      for (const c of $$('.sh', chips)) {
+        c.classList.add('pulse'); lens.classList.add('flash');
+        await wait(420);
+        out.append(el('li', '', `${c.textContent}: a Circle, handled as a Shape`));
+        c.classList.remove('pulse'); lens.classList.remove('flash');
+        await wait(260);
+      }
+      verdict(v, 'ok', OK + 'The method only took values <b>out</b> of the sequence. Each one really is a Shape, so nothing can go wrong. ' +
+        'The list itself was never copied or changed.');
+      busy = false;
+    });
+    $('#w1write').addEventListener('click', async () => {
+      if (busy) return; busy = true; reset();
+      $('#w1src h4').textContent = 'List<Shape> shapes = circles;   // same list object';
+      verdict(v, 'idle', 'Suppose that line compiled. <code>shapes</code> and <code>circles</code> now name the same list…');
+      await wait(1300);
+      verdict(v, 'idle', '…and the type <code>List&lt;Shape&gt;</code> has an <code>Add(Shape)</code> method, so this is legal: <code>shapes.Add(new Square());</code>');
+      await wait(900);
+      const sq = shape('Square', 'side 2'); sq.classList.add('drop'); chips.append(sq);
+      await wait(600);
+      src.classList.add('bad');
+      verdict(v, 'bad', NO + 'A Square is now sitting inside what the rest of the program believes is a <code>List&lt;Circle&gt;</code>. ' +
+        'The next <code>circles[3].Radius</code> would fail at run time. To make that impossible, the compiler rejects the very first line: ' +
+        '<code>List&lt;T&gt;</code> takes values in as well as handing them out, so it is invariant.');
+      busy = false;
+    });
+    $('#w1reset').addEventListener('click', () => { if (!busy) reset(); });
+    reset();
+  })();
+
+  // ---------- widget 2: Action contravariance ----------
+  (() => {
+    const st = { h: 'Shape', d: 'Circle', o: 'Circle' };
+    const track = $('#w2track'), v = $('#w2v');
+    const HANDLERS = { Shape: 'LogName(Shape s)', Circle: 'PrintRadius(Circle c)' };
+    let busy = false;
+    function objOptions() { return st.d === 'Shape' ? ['Circle', 'Square'] : ['Circle', 'Coin']; }
+    function render() {
+      if (!objOptions().includes(st.o)) st.o = 'Circle';
+      seg($('#w2h'), [{ value: 'Shape', label: HANDLERS.Shape }, { value: 'Circle', label: HANDLERS.Circle }], st.h, x => { st.h = x; render(); });
+      seg($('#w2d'), [{ value: 'Shape', label: 'Action<Shape>' }, { value: 'Circle', label: 'Action<Circle>' }], st.d, x => { st.d = x; render(); });
+      seg($('#w2o'), objOptions().map(o => ({ value: o, label: 'new ' + o + '()' })), st.o, x => { st.o = x; render(); });
+      $('#w2s0 span').textContent = `passes a ${st.o}`;
+      $('#w2s1 span').textContent = `Action<${st.d}>`;
+      $('#w2s2 span').textContent = HANDLERS[st.h];
+      $$('.station', $('#w2')).forEach(s => s.classList.remove('ok', 'bad'));
+      track.innerHTML = '';
+      const valid = isA(st.d, st.h);
+      const how = st.d === st.h ? 'The types match exactly, so no variance is involved.'
+        : 'The delegate guarantees every argument is a ' + st.d + ', and every ' + st.d + ' is a ' + st.h + '. This is contravariance.';
+      verdict(v, valid ? 'ok' : 'bad', valid
+        ? OK + `<code>Action&lt;${st.h}&gt;</code> can be used as <code>Action&lt;${st.d}&gt;</code>. ${how} Press Invoke to watch the call.`
+        : NO + `<code>Action&lt;Circle&gt;</code> cannot be used as <code>Action&lt;Shape&gt;</code>. Callers of an <code>Action&lt;Shape&gt;</code> may pass any shape, ` +
+          `but <code>PrintRadius</code> can only handle circles. Press Invoke to see what the compiler is preventing.`);
+    }
+    $('#w2run').addEventListener('click', async () => {
+      if (busy) return; busy = true; render();
+      const valid = isA(st.d, st.h), fits = isA(st.o, st.h);
+      const chip = shape(st.o); track.append(chip);
+      await wait(60); chip.style.left = '46%';
+      await wait(650); $('#w2s1').classList.add('ok');
+      chip.style.left = '86%';
+      await wait(650);
+      if (fits) {
+        $('#w2s2').classList.add('ok');
+        verdict(v, valid ? 'ok' : 'bad', (valid ? OK : NO) + (valid
+          ? `The handler expected a ${st.h} and received a ${st.o}. A ${st.o} is a ${st.h}, so it runs normally.`
+          : `This particular call would have worked, because a Circle happened to arrive. The compiler still refuses, since the next caller could pass a Square. Choose <code>new Square()</code> and invoke again.`));
+      } else {
+        $('#w2s2').classList.add('bad'); chip.style.transform = 'rotate(25deg) scale(.8)'; chip.style.opacity = '.5';
+        verdict(v, 'bad', NO + `<code>PrintRadius</code> asked for a Circle and was handed a ${st.o}, which has no <code>Radius</code>. ` +
+          `This is the failure the compiler rules out by rejecting the assignment in the first place.`);
+      }
+      busy = false;
+    });
+    render();
+  })();
+
+  // ---------- widget 3: comparer ----------
+  (() => {
+    const set = $('#w3set'), v = $('#w3v');
+    let kind = 'Circle', items = [], id = 0, busy = false;
+    const area = it => it.size == null ? null : (kind === 'Circle' ? Math.PI * it.size * it.size : it.size * it.size);
+    const compare = (a, b) => {                       // ShapeAreaComparer.Compare
+      const x = area(a), y = area(b);
+      if (x == null) return y == null ? 0 : -1;
+      return y == null ? 1 : Math.sign(x - y);
+    };
+    const fmt = n => n == null ? 'null' : String(Number(n.toPrecision(6)));
+    function draw() {
+      const before = new Map($$('[data-key]', set).map(e => [e.dataset.key, e.getBoundingClientRect()]));
+      set.innerHTML = '';
+      items.forEach(it => {
+        const a = area(it), w = el('div', 'item'); w.dataset.key = it.id;
+        const s = a == null ? shape('null', 'null') : shape(kind, '');
+        if (a != null) { const px = Math.round(Math.max(18, Math.min(72, 16 + 11 * Math.log10(a + 1)))); s.style.width = s.style.height = px + 'px'; }
+        w.append(s, el('span', '', a == null ? '&nbsp;' : 'area ' + fmt(a)));
+        set.append(w);
+      });
+      $$('[data-key]', set).forEach(e => {
+        const f = before.get(e.dataset.key), l = e.getBoundingClientRect();
+        if (!e.animate) return;
+        if (f) { const dx = f.left - l.left, dy = f.top - l.top; if (dx || dy) e.animate([{ transform: `translate(${dx}px,${dy}px)` }, { transform: 'none' }], { duration: 450, easing: 'ease' }); }
+        else e.animate([{ transform: 'translateY(-36px) scale(.4)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 450, easing: 'ease' });
+      });
+    }
+    function add(size) {
+      const it = { id: ++id, size };
+      let pos = 0, last = null;
+      for (; pos < items.length; pos++) {
+        const c = compare(it, items[pos]); last = [it, items[pos], c];
+        if (c === 0) { verdict(v, 'idle', `<code>Compare</code> returned 0 against an existing element, so the set treats the new one as a duplicate and ignores it.`); return; }
+        if (c < 0) break;
+      }
+      items.splice(pos, 0, it); draw();
+      const what = size == null ? 'null' : `new ${kind}(${size})`;
+      verdict(v, 'ok', `<span class="tag in">in</span>Added <code>${what}</code>. ` + (last
+        ? `Last call: <code>Compare(${fmt(area(last[0]))}, ${fmt(area(last[1]))})</code> returned ${last[2]}. `
+        : 'It was the first element, so nothing was compared. ') +
+        `The comparer's parameters are typed <code>Shape</code>; it only reads <code>.Area</code>, which every ${kind} has.`);
+    }
+    function setKind(k) {
+      kind = k; items = [];
+      seg($('#w3k'), [{ value: 'Circle', label: 'SortedSet<Circle>' }, { value: 'Square', label: 'SortedSet<Square>' }], kind, x => { if (!busy) setKind(x); });
+      draw();
+      verdict(v, 'idle', `<code>new SortedSet&lt;${kind}&gt;(new ShapeAreaComparer())</code>: the constructor asks for <code>IComparer&lt;${kind}&gt;</code> and accepts our <code>IComparer&lt;Shape&gt;</code>.`);
+    }
+    $('#w3page').addEventListener('click', async () => {
+      if (busy) return; busy = true; items = []; draw();
+      for (const s of [7.2, 100, null, 0.01]) { await wait(250); add(s); await wait(750); }
+      verdict(v, 'ok', `<span class="tag ok">result</span>Inserted in the order 7.2, 100, null, 0.01 and stored as null, then by rising area. With circles this matches the output listed on the Microsoft page.`);
+      busy = false;
+    });
+    $('#w3rand').addEventListener('click', () => { if (!busy) add(Number((Math.random() * 30 + 0.5).toFixed(1))); });
+    $('#w3null').addEventListener('click', () => { if (!busy) add(null); });
+    $('#w3clear').addEventListener('click', () => { if (!busy) setKind(kind); });
+    setKind('Circle');
+  })();
+
+  // ---------- widget 4: Func checker ----------
+  (() => {
+    const st = { a: 'Shape', b: 'Circle', c: 'Shape', d: 'Shape' };
+    const flipT = t => t === 'Shape' ? 'Circle' : 'Shape';
+    function render() {
+      $$('#w4 .slot').forEach(b => b.textContent = st[b.dataset.s]);
+      const pin = isA(st.c, st.a), pout = isA(st.b, st.d);
+      verdict($('#w4in'), pin ? 'ok' : 'bad', `<span class="tag in">in · parameter</span>Callers of <code>target</code> pass a <b>${st.c}</b>. ` +
+        `<code>source</code> needs a <b>${st.a}</b>. ` + (pin
+          ? (st.c === st.a ? 'Same type.' : `A ${st.c} is a ${st.a}, so every argument is acceptable.`)
+          : `A ${st.c} is not necessarily a ${st.a}: a Square could arrive.`));
+      verdict($('#w4out'), pout ? 'ok' : 'bad', `<span class="tag out">out · result</span><code>source</code> returns a <b>${st.b}</b>. ` +
+        `Callers of <code>target</code> expect a <b>${st.d}</b>. ` + (pout
+          ? (st.b === st.d ? 'Same type.' : `A ${st.b} is a ${st.d}, so every result is acceptable.`)
+          : `A ${st.b} is not necessarily a ${st.d}: the result could be a Square.`));
+      const same = st.a === st.c && st.b === st.d;
+      let note = '';
+      if (st.a === 'Shape' && st.b === 'Circle') {
+        const k = st.c + st.d;
+        note = { ShapeShape: ' This is <code>f2</code> on the page.', CircleCircle: ' This is <code>f3</code> on the page.', CircleShape: ' This is <code>f4</code> on the page.' }[k] || '';
+      }
+      verdict($('#w4v'), pin && pout ? 'ok' : 'bad', (pin && pout ? OK : NO) + (same ? 'Identical types, so this is a plain assignment.'
+        : pin && pout ? 'Both checks pass, so the assignment is allowed.' + note
+        : 'At least one check fails, so the assignment is rejected.'));
+    }
+    $$('#w4 .slot').forEach(b => b.addEventListener('click', () => { st[b.dataset.s] = flipT(st[b.dataset.s]); render(); }));
+    const preset = (a, b, c, d) => () => { Object.assign(st, { a, b, c, d }); render(); };
+    $('#w4p2').addEventListener('click', preset('Shape', 'Circle', 'Shape', 'Shape'));
+    $('#w4p3').addEventListener('click', preset('Shape', 'Circle', 'Circle', 'Circle'));
+    $('#w4p4').addEventListener('click', preset('Shape', 'Circle', 'Circle', 'Shape'));
+    $('#w4bad').addEventListener('click', preset('Circle', 'Shape', 'Shape', 'Circle'));
+    render();
+  })();
+
+  // ---------- widget 5: two steps ----------
+  (() => {
+    const ROWS = ['Shape', 'Circle', 'Coin'];
+    const COLS = [
+      { head: 'MyMethod', sub: 'the method itself', takes: 'Shape', returns: 'Coin' },
+      { head: 'Func<Circle, Circle> f1', sub: 'step 1 · method binding', takes: 'Circle', returns: 'Circle' },
+      { head: 'Func<Coin, Shape> f2', sub: 'step 2 · generic variance', takes: 'Coin', returns: 'Shape' }
+    ];
+    const SAY = [
+      'The method accepts any <b>Shape</b> and always returns a <b>Coin</b>. That is the widest input and the narrowest output it can offer, which gives the most room for conversions.',
+      '<span class="tag ok">step 1</span>Creating <code>f1</code> from the method name. The delegate promises to pass only Circles (the <span class="kin">takes</span> token moved down the ladder) ' +
+        'and promises its callers only a Circle back (the <span class="kout">returns</span> token moved up). The method over-delivers on both. This flexibility in method binding has existed since C# 2 and works for every delegate type.',
+      '<span class="tag ok">step 2</span>Converting the delegate object <code>f1</code> to another <code>Func</code> type. The parameter moves down again, to Coin, and the result moves up again, to Shape. ' +
+        'This is generic variance, and it needs both types to come from <code>Func&lt;T, TResult&gt;</code>. Notice the pattern: <b>takes</b> only ever moves toward derived types, <b>returns</b> only toward base types.'
+    ];
+    let step = 0;
+    function render() {
+      const t = $('#w5t'); t.innerHTML = '';
+      const hr = el('tr'); hr.append(el('th'));
+      COLS.forEach((c, i) => { const th = el('th', i > step ? 'col-hidden' : '', esc(c.head) + `<small>${c.sub}</small>`); hr.append(th); });
+      t.append(hr);
+      ROWS.forEach((r, ri) => {
+        const tr = el('tr');
+        tr.append(el('td', 'type', r + `<small>${['base', '', 'most derived'][ri]}</small>`));
+        COLS.forEach((c, i) => {
+          const td = el('td', i > step ? 'col-hidden' : '');
+          if (i <= step) {
+            if (c.takes === r) td.append(el('span', 'tok in', 'takes'));
+            if (c.returns === r) td.append(el('span', 'tok out', 'returns'));
+          }
+          tr.append(td);
+        });
+        t.append(tr);
+      });
+      verdict($('#w5v'), step ? 'ok' : 'idle', SAY[step]);
+      $('#w5back').disabled = step === 0;
+      $('#w5next').disabled = step === 2;
+    }
+    $('#w5next').addEventListener('click', () => { step = Math.min(2, step + 1); render(); });
+    $('#w5back').addEventListener('click', () => { step = Math.max(0, step - 1); render(); });
+    render();
+  })();
+
+  // ---------- widget 6: author playground ----------
+  (() => {
+    let kw = 'out';
+    function render() {
+      seg($('#w6k'), [{ value: 'out', label: 'out T' }, { value: 'in', label: 'in T' }, { value: '', label: 'T (none)' }], kw, x => { kw = x; render(); });
+      const k = kw ? `<span class="k${kw}">${kw}</span> ` : '';
+      const getOk = kw !== 'in', putOk = kw !== 'out';
+      const line = (code, ok, msg) => `<div class="${ok ? 'fine' : 'err'}"><span>${code}</span><small>${msg}</small></div>`;
+      $('#w6code').innerHTML =
+        `<div><span>interface IBox&lt;${k}T&gt;</span></div><div><span>{</span></div>` +
+        line('&nbsp;&nbsp;&nbsp;&nbsp;T Get();', getOk, getOk ? 'allowed: T leaves through a return type'
+          : 'error CS1961: T is contravariant, so it cannot be returned') +
+        line('&nbsp;&nbsp;&nbsp;&nbsp;void Put(T item);', putOk, putOk ? 'allowed: T enters through a parameter'
+          : 'error CS1961: T is covariant, so it cannot be a parameter') +
+        `<div><span>}</span></div>`;
+      const msg = {
+        out: `<span class="tag out">out</span>Your callers gain <code>IBox&lt;Circle&gt;</code> → <code>IBox&lt;Shape&gt;</code>. You pay by giving up <code>Put</code>. ` +
+          `If it were allowed, someone could convert a box of circles to <code>IBox&lt;Shape&gt;</code> and put a Square into it.`,
+        in: `<span class="tag in">in</span>Your callers gain <code>IBox&lt;Shape&gt;</code> → <code>IBox&lt;Circle&gt;</code>. You pay by giving up <code>Get</code>. ` +
+          `If it were allowed, a box of shapes viewed as <code>IBox&lt;Circle&gt;</code> could hand back a Square to code expecting a Circle.`,
+        '': `Both members compile, and callers get no conversions at all: <code>IBox&lt;Circle&gt;</code> and <code>IBox&lt;Shape&gt;</code> are unrelated. ` +
+          `The usual design is to split it into a read-only <code>out</code> interface and a write-only <code>in</code> interface, as .NET does with <code>IEnumerable&lt;T&gt;</code> and <code>IComparer&lt;T&gt;</code>.`
+      }[kw];
+      verdict($('#w6v'), kw ? 'ok' : 'idle', msg);
+
+      // Good use vs. hypothetical misuse, for out and in only.
+      // Each line: [code, comment, kind] where kind is '', 'ok', 'no' or 'bang'.
+      const block = lines => '<pre>' + lines.map(([code, note, kind]) => {
+        const c = esc(code) + (note ? `   <span class="${kind === 'ok' ? 'ok' : kind ? 'no' : 'c'}">// ${esc(note)}</span>` : '');
+        return `<span class="${kind === 'bang' ? 'bang' : ''}">${c}</span>`;
+      }).join('') + '</pre>';
+      const card = (cls, title, sub, lines) => `<div class="${cls}"><h4>${title}</h4><p>${sub}</p>${block(lines)}</div>`;
+      const bad = {
+        out: card('good', '<span class="tag ok">safe</span>What out T is for',
+            'With only <code>Get</code>, viewing circles as shapes can never go wrong.', [
+            ['IBox<Circle> circles = new CircleBox();', ''],
+            ['IBox<Shape>  shapes  = circles;', 'allowed by out T', 'ok'],
+            ['Shape s = shapes.Get();', 'a Circle comes out: it is a Shape', 'ok']
+          ]) +
+          card('evil', '<span class="tag bad">misuse</span>If Put(T item) were allowed',
+            'Same object, two views. The red lines are what CS1961 prevents.', [
+            ['class CircleBox : IBox<Circle>', ''],
+            ['{', ''],
+            ['    Circle _item = new Circle(1);', ''],
+            ['    public Circle Get() => _item;', ''],
+            ['    public void Put(Circle item) => _item = item;', ''],
+            ['}', ''],
+            ['', ''],
+            ['IBox<Circle> circles = new CircleBox();', ''],
+            ['IBox<Shape>  shapes  = circles;', 'allowed by out T', 'ok'],
+            ['shapes.Put(new Square(2));', 'Put(Shape) accepts a Square', 'bang'],
+            ['Circle c = circles.Get();', 'the Square comes back as a "Circle"', 'bang'],
+            ['Console.WriteLine(c.Radius);', 'a Square has no Radius', 'bang']
+          ]),
+        in: card('good', '<span class="tag ok">safe</span>What in T is for',
+            'With only <code>Put</code>, viewing a shape box as a circle box can never go wrong.', [
+            ['IBox<Shape>  shapes  = new ShapeBox();', ''],
+            ['IBox<Circle> circles = shapes;', 'allowed by in T', 'ok'],
+            ['circles.Put(new Circle(3));', 'a Circle goes in: it is a Shape', 'ok']
+          ]) +
+          card('evil', '<span class="tag bad">misuse</span>If T Get() were allowed',
+            'Same object, two views. The red lines are what CS1961 prevents.', [
+            ['class ShapeBox : IBox<Shape>', ''],
+            ['{', ''],
+            ['    Shape _item = new Square(2);', 'holds a Square'],
+            ['    public Shape Get() => _item;', ''],
+            ['    public void Put(Shape item) => _item = item;', ''],
+            ['}', ''],
+            ['', ''],
+            ['IBox<Shape>  shapes  = new ShapeBox();', ''],
+            ['IBox<Circle> circles = shapes;', 'allowed by in T', 'ok'],
+            ['Circle c = circles.Get();', 'Get() promises a Circle, returns the Square', 'bang'],
+            ['Console.WriteLine(c.Radius);', 'a Square has no Radius', 'bang']
+          ]),
+        '': ''
+      }[kw];
+      $('#w6bad').innerHTML = bad;
+    }
+    render();
+  })();
+
+  // ---------- widget 7: array covariance ----------
+  (() => {
+    const cells = $('#w7cells'), v = $('#w7v');
+    let filled = [], busy = false;
+    function draw() {
+      cells.innerHTML = '';
+      for (let i = 0; i < 3; i++) {
+        const c = el('div', 'cell' + (i === Math.min(filled.length, 2) && filled.length < 3 ? ' next' : ''), `<i>[${i}]</i>`);
+        const t = filled[i];
+        if (t === 'null') c.append(el('span', '', '<span class="mono" style="font-size:.75rem;color:var(--muted)">null</span>'));
+        else if (t) c.append(shape(t, t === 'Coin' ? 'Coin' : ''));
+        cells.append(c);
+      }
+    }
+    function reset() {
+      filled = []; draw();
+      verdict(v, 'idle', 'Every store compiles. The runtime checks each one against the array\'s <b>actual</b> element type, Circle.');
+    }
+    $$('#w7 button[data-v]').forEach(b => b.addEventListener('click', async () => {
+      if (busy) return;
+      if (filled.length >= 3) { reset(); }
+      const t = b.dataset.v, i = filled.length;
+      const fits = t === 'null' || isA(t, 'Circle');
+      if (fits) {
+        filled.push(t); draw();
+        const s = $$('.cell', cells)[i].firstElementChild;
+        if (s && s.animate) s.animate([{ transform: 'translateY(-30px)', opacity: 0 }, { transform: 'none', opacity: 1 }], { duration: 400, easing: 'ease' });
+        const how = t === 'null' ? 'null is always allowed.'
+          : t === 'Circle' ? 'A Circle matches the real element type.'
+          : 'A Coin derives from Circle, so it is compatible with a Circle[].';
+        verdict(v, 'ok', `<span class="tag ok">runs</span><code>shapes[${i}] = ${t === 'null' ? 'null' : 'new ' + t + '()'};</code> compiled, and the run-time check passed: ${how}`);
+      } else {
+        busy = true;
+        const cell = $$('.cell', cells)[i];
+        const s = shape('Square', ''); s.classList.add('bounce'); cell.append(s); cell.classList.add('reject');
+        verdict(v, 'bad', `<span class="tag ok">compiles</span><span class="tag bad">throws</span><code>shapes[${i}] = new Square();</code> is fine for the compiler, because <code>shapes</code> is declared <code>Shape[]</code>. ` +
+          `At run time the store is checked against the real element type, Circle, and fails with <code>System.ArrayTypeMismatchException</code>. Nothing was stored.`);
+        await wait(750);
+        cell.classList.remove('reject'); s.remove(); busy = false;
+      }
+    }));
+    $('#w7reset').addEventListener('click', () => { if (!busy) reset(); });
+    reset();
+  })();
+
+  // ---------- quiz ----------
+  (() => {
+    const QS = [
+      { code: 'IEnumerable<object> items = new List<string>();', ok: true,
+        why: 'Covariance. IEnumerable<out T> only hands values out, and every string is an object.' },
+      { code: 'List<object> items = new List<string>();', ok: false,
+        why: 'List<T> is a class, so it is invariant. If this compiled, items.Add(42) would put an int into a list of strings.' },
+      { code: 'IEnumerable<object> items = new List<int>();', ok: false,
+        why: 'Variance applies only to reference types. int is a value type and would need boxing.' },
+      { code: 'Action<object> log = Console.WriteLine;\nAction<string> onText = log;', ok: true,
+        why: 'Contravariance. onText will only ever be given strings, and log can handle any object.' },
+      { code: 'Func<object> make = () => "hi";\nFunc<string> makeText = make;', ok: false,
+        why: 'Wrong direction for out. make is only known to return some object, so it cannot promise a string.' },
+      { code: 'IComparer<Shape> byArea = new ShapeAreaComparer();\nIComparer<Circle> forCircles = byArea;', ok: true,
+        why: 'Contravariance on IComparer<in T>. A comparer that handles any Shape can compare two Circles.' },
+      { code: 'interface ISink<out T>\n{\n    void Push(T item);\n}', ok: false,
+        why: 'An out type parameter may not appear as a method parameter. This is error CS1961; the keyword should be in.' }
+    ];
+    const host = $('#quiz'); let right = 0, done = 0;
+    const score = () => $('#score').textContent = done ? `Score: ${right} of ${done} answered.` : '';
+    QS.forEach((q, i) => {
+      const box = el('div', 'q', `<pre>${esc(q.code)}</pre>`);
+      const row = el('div', 'row'), fb = el('div', 'fb');
+      [['Compiles', true], ["Doesn't compile", false]].forEach(([label, val]) => {
+        const b = el('button', '', label);
+        b.addEventListener('click', () => {
+          $$('button', row).forEach(x => x.disabled = true);
+          const good = val === q.ok; done++; if (good) right++;
+          fb.innerHTML = `<span class="tag ${good ? 'ok' : 'bad'}">${good ? 'Right' : 'Not quite'}</span>` +
+            `It ${q.ok ? 'compiles' : "doesn't compile"}. ${esc(q.why)}`;
+          score();
+        });
+        row.append(b);
+      });
+      box.append(row, fb); host.append(box);
+    });
+  })();
+})();
+</script>
+</body>
+</html>

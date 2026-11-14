@@ -1,0 +1,848 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Exceptions in C#, hands on</title>
+<style>
+
+  :root {
+    --bg: #f6f4ef; --panel: #ffffff; --ink: #1d2330; --muted: #5d6677; --line: #d9d5cb;
+    --seq: #1f7a8c; --cur: #b4531a; --acc: #6b3fa0; --soft: #ece8df; --code: #f1eee7;
+    --ok: #2c7a4b; --okbg: #e3f3e8; --bad: #b3261e; --badbg: #fbe6e4; --hl: #fff1c9;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #14171d; --panel: #1c2029; --ink: #e8eaf0; --muted: #9aa3b5; --line: #323848;
+      --seq: #4fb6c9; --cur: #f08a4b; --acc: #b48cf0; --soft: #262b37; --code: #171a21;
+      --ok: #6fcf97; --okbg: #17301f; --bad: #ff8a80; --badbg: #3a1b19; --hl: #3d3519;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 64px; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 940px; margin: 0 auto; padding: 24px 16px 80px; }
+  h1 { font-size: 1.75rem; line-height: 1.2; margin: 8px 0 10px; letter-spacing: -0.015em; }
+  h2 { font-size: 1.3rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h3 { font-size: 1rem; margin: 0 0 6px; }
+  p { margin: 0 0 12px; }
+  .lead { color: var(--muted); max-width: 70ch; }
+  code, pre, .mono { font-family: ui-monospace, "Cascadia Code", Consolas, Menlo, monospace; font-size: 0.9em; }
+  pre { margin: 0 0 12px; background: var(--code); border-radius: 8px; padding: 10px 12px; overflow-x: auto;
+    font-size: 0.82rem; line-height: 1.55; }
+  pre .c { color: var(--muted); } pre .ok { color: var(--ok); font-weight: 600; } pre .no { color: var(--bad); font-weight: 600; }
+  .seqc { color: var(--seq); font-weight: 700; } .curc { color: var(--cur); font-weight: 700; }
+
+  nav { position: sticky; top: 0; z-index: 20; background: var(--bg); border-bottom: 1px solid var(--line); }
+  nav div { max-width: 940px; margin: 0 auto; padding: 8px 16px; display: flex; gap: 6px; overflow-x: auto; }
+  nav a { flex: none; font-size: 0.85rem; color: var(--muted); text-decoration: none; padding: 5px 11px;
+    border-radius: 999px; border: 1px solid transparent; }
+  nav a.on { color: var(--ink); border-color: var(--line); background: var(--panel); }
+
+  section { margin-top: 44px; }
+  .eyebrow { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--acc); font-weight: 700; }
+  .sub { color: var(--muted); margin-bottom: 14px; }
+  .mentor { border-left: 4px solid var(--acc); background: var(--panel); border-radius: 0 10px 10px 0; padding: 12px 14px; margin: 0 0 14px; }
+  .mentor b.who { display: block; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--acc); margin-bottom: 4px; }
+  .mentor p:last-child { margin-bottom: 0; }
+  .doc { font-size: 0.86rem; color: var(--muted); border-top: 1px dashed var(--line); padding-top: 8px; margin-top: 10px; }
+  .doc b { color: var(--ink); }
+
+  .rule { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .rule { grid-template-columns: 1fr; } }
+  .rule > div { border-radius: 10px; padding: 12px 14px; color: var(--ink); border: 1px solid var(--line); border-left-width: 4px; }
+  .rule .s { background: color-mix(in srgb, var(--seq) 10%, var(--panel)); border-left-color: var(--seq); }
+  .rule .k { background: color-mix(in srgb, var(--cur) 10%, var(--panel)); border-left-color: var(--cur); }
+  .rule .s b { color: var(--seq); } .rule .k b { color: var(--cur); }
+  .rule b { font-size: 1.05rem; } .rule p { margin: 4px 0 0; font-size: 0.93rem; }
+
+  .w { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+  .w > h3 { display: flex; align-items: center; gap: 8px; }
+  .w > h3::before { content: "Try it"; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+    background: var(--acc); color: #fff; padding: 2px 7px; border-radius: 4px; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 8px 0; }
+  button { font: inherit; color: var(--ink); background: var(--bg); border: 1px solid var(--line);
+    border-radius: 7px; padding: 6px 12px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--muted); }
+  button:disabled { opacity: 0.45; cursor: default; }
+  button.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  button.mono { font-family: ui-monospace, Consolas, monospace; font-size: 0.84rem; }
+  button:focus-visible, dfn:focus-visible, summary:focus-visible { outline: 2px solid var(--acc); outline-offset: 2px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; flex-wrap: wrap; }
+  .seg button { border: 0; border-radius: 0; background: transparent; font-size: 0.86rem; }
+  .seg button[aria-pressed="true"] { background: var(--acc); color: #fff; }
+
+  .verdict { border-radius: 8px; padding: 10px 12px; margin: 10px 0 0; font-size: 0.95rem; min-height: 2.8em; }
+  .verdict.ok { background: var(--okbg); border: 1px solid var(--ok); }
+  .verdict.bad { background: var(--badbg); border: 1px solid var(--bad); }
+  .verdict.idle { background: var(--soft); border: 1px solid transparent; color: var(--muted); }
+  .tag { display: inline-block; font-size: 0.74rem; font-weight: 700; padding: 1px 7px; border-radius: 4px; margin-right: 6px; color: #fff; }
+  .tag.ok { background: var(--ok); } .tag.bad { background: var(--bad); } .tag.seq { background: var(--seq); } .tag.cur { background: var(--cur); }
+
+  /* sequence strip with cursors */
+  .strip { display: flex; align-items: flex-end; gap: 6px; padding: 18px 6px 6px; position: relative; overflow-x: auto; }
+  .slot { flex: none; width: 74px; text-align: center; }
+  .slot .card { height: 48px; border-radius: 8px; background: var(--seq); color: #fff; font-weight: 700; font-size: 0.85rem;
+    display: flex; align-items: center; justify-content: center; transition: transform .3s, box-shadow .3s; }
+  .slot .card.edge { background: transparent; border: 2px dashed var(--line); color: var(--muted); font-weight: 400; font-size: 0.72rem; }
+  .slot small { display: block; font: 0.7rem ui-monospace, Consolas, monospace; color: var(--muted); margin-top: 3px; }
+  .slot .card.lit { transform: translateY(-6px); box-shadow: 0 0 0 3px var(--hl), 0 6px 14px rgba(0,0,0,.2); }
+  .slot.added .card { background: var(--acc); animation: drop .45s; }
+  @keyframes drop { from { transform: translateY(-26px) scale(.5); opacity: 0; } }
+
+  .cursor-row { display: grid; grid-template-columns: 54px 1fr; gap: 8px; align-items: center; border-top: 1px dashed var(--line); padding: 8px 0; }
+  .cursor-row .name { font: 700 0.9rem ui-monospace, Consolas, monospace; color: var(--cur); }
+  .pins { display: flex; gap: 6px; padding: 0 6px; overflow-x: auto; }
+  .pin { flex: none; width: 74px; height: 20px; position: relative; }
+  .pin.on::after { content: "▲"; position: absolute; left: 50%; transform: translateX(-50%); color: var(--cur); font-size: 1rem; line-height: 1; animation: pop .3s; }
+  @keyframes pop { from { transform: translate(-50%, 8px); opacity: 0; } }
+  .cbtns { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 4px; }
+  .cbtns button { font-size: 0.8rem; padding: 4px 9px; font-family: ui-monospace, Consolas, monospace; }
+  ul.log { list-style: none; margin: 8px 0 0; padding: 8px 10px; background: var(--code); border-radius: 8px;
+    font: 0.8rem/1.6 ui-monospace, Consolas, monospace; max-height: 180px; overflow-y: auto; min-height: 2.2em; }
+  ul.log li { animation: slide .3s; }
+  ul.log li.bad { color: var(--bad); } ul.log li.ok { color: var(--ok); }
+  ul.log li .who { display: inline-block; min-width: 5.5em; font-weight: 700; }
+  @keyframes slide { from { opacity: 0; transform: translateX(-8px); } }
+
+  /* side by side code */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 760px) { .pair { grid-template-columns: 1fr; } }
+  .pane { min-width: 0; }
+  .pane h4 { margin: 0 0 6px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+  .lines { background: var(--code); border-radius: 8px; padding: 8px 0; font: 0.8rem/1.65 ui-monospace, Consolas, monospace; overflow-x: auto; }
+  .lines div { padding: 0 12px; white-space: pre; border-left: 3px solid transparent; transition: background .2s; }
+  .lines div.on { background: var(--hl); border-left-color: var(--acc); }
+  .lines div.caller.on { border-left-color: var(--seq); }
+  .lines div.iter.on { border-left-color: var(--cur); }
+  .state { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.86rem; margin-top: 10px; }
+  .state span b { font-family: ui-monospace, Consolas, monospace; }
+
+  /* sorter */
+  .sorter { display: grid; gap: 8px; }
+  .srow { display: grid; grid-template-columns: minmax(0, 1.3fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; transition: border-color .3s, background .3s; }
+  .srow code { font-size: 0.82rem; overflow-wrap: anywhere; }
+  .srow.right { border-color: var(--ok); background: var(--okbg); }
+  .srow.wrong { border-color: var(--bad); background: var(--badbg); animation: shake .4s; }
+  .srow .why { grid-column: 1 / -1; font-size: 0.85rem; color: var(--muted); }
+  .srow .why:empty { display: none; }
+  @keyframes shake { 25% { transform: translateX(-4px); } 50% { transform: translateX(4px); } 75% { transform: translateX(-2px); } }
+
+  /* variant simulator */
+  .runs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .run { font: 0.78rem ui-monospace, Consolas, monospace; border-radius: 6px; padding: 4px 8px; background: var(--soft); animation: drop .3s; }
+  .run.t { background: var(--okbg); border: 1px solid var(--ok); }
+  .run.f { background: var(--soft); border: 1px solid var(--line); }
+  .run.x { background: var(--badbg); border: 1px solid var(--bad); }
+
+  details { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 8px 0; }
+  summary { cursor: pointer; font-weight: 600; }
+  details > *:not(summary) { margin-top: 10px; }
+  .views { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0; }
+  @media (max-width: 700px) { .views { grid-template-columns: 1fr; } }
+  .view { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; }
+  .view h3 { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+  .view p:last-child { margin-bottom: 0; }
+
+  .q { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin: 10px 0; }
+  .q .prompt { font-weight: 600; margin-bottom: 8px; }
+  .q pre { margin-bottom: 10px; }
+  .q .opts { display: grid; gap: 6px; }
+  .q .opts button { text-align: left; }
+  .q .opts button.right { border-color: var(--ok); background: var(--okbg); }
+  .q .opts button.wrong { border-color: var(--bad); background: var(--badbg); }
+  .q .fb { margin-top: 10px; font-size: 0.93rem; }
+  .score { font-weight: 700; }
+  ol.check { padding-left: 22px; } ol.check li { margin-bottom: 10px; }
+  ol.check details { margin: 6px 0 0; padding: 6px 10px; }
+
+  dfn { font-style: normal; border-bottom: 2px dotted var(--acc); cursor: help; }
+  #tip { position: absolute; left: 0; top: 0; z-index: 50; max-width: min(300px, calc(100vw - 16px)); background: var(--ink); color: var(--bg);
+    font-size: 0.85rem; line-height: 1.4; padding: 8px 10px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.3); pointer-events: none; opacity: 0; transition: opacity .15s; }
+  #tip.show { opacity: 1; } #tip b { display: block; margin-bottom: 2px; }
+  .src { --bw: min(1560px, calc(100vw - 48px)); display: grid; grid-template-columns: 1fr; gap: 12px; margin-top: 10px; }
+  @media (min-width: 1100px) {
+    .src { width: var(--bw); margin-left: calc((100% - var(--bw)) / 2); grid-template-columns: minmax(0, 1fr) minmax(300px, 0.85fr) minmax(0, 1fr); align-items: start; }
+    .notes-pane { position: sticky; top: 64px; max-height: calc(100vh - 80px); overflow-y: auto; }
+    .src .srclines div .tx { white-space: pre-wrap; overflow-wrap: anywhere; }
+    .src ol.notes li { font-size: 0.86rem; padding: 7px 9px; }
+  }
+  .notes-pane ol.notes { margin-top: 0; }
+  .srclines div { position: relative; padding-left: 34px; display: flex; }
+  .srclines div .ind { white-space: pre; flex: none; }
+  .srclines div .tx { white-space: pre; flex: 1; min-width: 0; }
+  .srclines div.cm { color: var(--muted); }
+  .srclines div[data-n] { cursor: pointer; }
+  .srclines div[data-n]::after { content: attr(data-n); position: absolute; left: 8px; top: 2px; font: 700 0.66rem system-ui, sans-serif;
+    background: var(--acc); color: #fff; border-radius: 999px; min-width: 17px; height: 17px; display: flex; align-items: center; justify-content: center; padding: 0 4px; }
+  .srclines div.on { background: var(--hl); border-left-color: var(--acc); }
+  ol.notes { margin: 12px 0 0; padding-left: 0; list-style: none; display: grid; gap: 6px; counter-reset: n; }
+  ol.notes li { display: grid; grid-template-columns: 26px 1fr; gap: 8px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--panel); font-size: 0.92rem; transition: border-color .2s, background .2s; cursor: pointer; }
+  ol.notes li::before { counter-increment: n; content: counter(n); font: 700 0.75rem system-ui, sans-serif; background: var(--acc); color: #fff;
+    border-radius: 999px; width: 20px; height: 20px; display: flex; align-items: center; justify-content: center; margin-top: 2px; }
+  ol.notes li.on { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, var(--panel)); }
+  footer { margin-top: 48px; color: var(--muted); font-size: 0.85rem; }
+  footer a { color: inherit; } footer li { margin-bottom: 4px; }
+  @media (prefers-reduced-motion: reduce) { * { animation-duration: .01s !important; transition-duration: .01s !important; } }
+
+  .stackcol { display: grid; gap: 6px; }
+  .frame { border: 2px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--panel); transition: border-color .3s, background .3s, opacity .3s, transform .3s; }
+  .frame .fhead { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .frame .fname { font: 700 0.86rem ui-monospace, Consolas, monospace; }
+  .frame .fopts { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 0.8rem; color: var(--muted); }
+  .frame select { font: 0.8rem ui-monospace, Consolas, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; }
+  .frame label { display: inline-flex; align-items: center; gap: 4px; }
+  .frame.thrower { border-style: dashed; }
+  .frame.search { border-color: var(--acc); background: color-mix(in srgb, var(--acc) 8%, var(--panel)); }
+  .frame.miss { opacity: .55; }
+  .frame.hit { border-color: var(--ok); background: var(--okbg); }
+  .frame.fin { border-color: var(--cur); background: color-mix(in srgb, var(--cur) 10%, var(--panel)); }
+  .frame.gone { opacity: .35; transform: scale(.98); }
+  .frame.crash { border-color: var(--bad); background: var(--badbg); }
+  .tagline { font: 0.75rem ui-monospace, Consolas, monospace; color: var(--muted); }
+  .bolt { display: inline-block; padding: 1px 8px; border-radius: 999px; background: var(--bad); color: #fff; font: 700 0.74rem system-ui, sans-serif; animation: drop .4s; }
+
+  .catches { display: grid; gap: 6px; margin: 8px 0; }
+  .catches .cl { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font: 0.86rem ui-monospace, Consolas, monospace;
+    padding: 6px 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--code); transition: background .3s, border-color .3s; }
+  .catches .cl.run { background: var(--okbg); border-color: var(--ok); }
+  .catches .cl.dead { background: var(--badbg); border-color: var(--bad); }
+  .catches select { font: 0.84rem ui-monospace, Consolas, monospace; background: var(--bg); color: var(--ink); border: 1px solid var(--line); border-radius: 6px; padding: 3px 4px; }
+
+  .trace { background: var(--code); border-radius: 8px; padding: 10px 12px; font: 0.8rem/1.7 ui-monospace, Consolas, monospace; min-height: 4em; overflow-x: auto; }
+  .trace div { white-space: pre; animation: slide .3s; }
+  .trace .lost { color: var(--bad); text-decoration: line-through; opacity: .75; }
+  .trace .lost::after { content: "   ← lost"; text-decoration: none; display: inline-block; font-family: system-ui, sans-serif; font-weight: 700; }
+  .trace .head { font-weight: 700; }
+  .trace .mark { color: var(--acc); font-weight: 700; }
+  .trace .inner { color: var(--muted); }
+  .warn { display: flex; gap: 8px; align-items: baseline; font-size: 0.88rem; padding: 8px 10px; border-radius: 8px; margin-top: 8px;
+    background: color-mix(in srgb, #d4a017 14%, var(--panel)); border: 1px solid #d4a017; }
+  .warn b { font-family: ui-monospace, Consolas, monospace; }
+
+  .checks { display: grid; gap: 6px; margin: 8px 0; }
+  .checks label { display: flex; gap: 8px; align-items: center; font-size: 0.92rem; }
+  .checks code { font-size: 0.84rem; }
+  ul.lint { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 6px; }
+  ul.lint li { padding: 7px 10px; border-radius: 8px; font-size: 0.9rem; border: 1px solid var(--line); }
+  ul.lint li.ok { background: var(--okbg); border-color: var(--ok); } ul.lint li.bad { background: var(--badbg); border-color: var(--bad); }
+
+  .review { display: grid; gap: 8px; }
+  .rcard { border: 1px solid var(--line); border-left-width: 4px; border-radius: 10px; padding: 10px 12px; background: var(--panel); }
+  .rcard.good { border-left-color: var(--ok); } .rcard.note { border-left-color: #d4a017; } .rcard.fix { border-left-color: var(--bad); }
+  .rcard { min-width: 0; }
+  @media (max-width: 600px) { table.ref td:first-child { white-space: normal; overflow-wrap: anywhere; } table.ref { font-size: 0.84rem; display: block; overflow-x: auto; } }
+  .rcard h4 { margin: 0 0 4px; font-size: 0.95rem; }
+  .rcard p { margin: 0 0 6px; font-size: 0.92rem; } .rcard p:last-child { margin-bottom: 0; }
+  .rcard pre { margin: 6px 0 0; }
+  table.ref { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  table.ref th, table.ref td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  table.ref td:first-child { font-family: ui-monospace, Consolas, monospace; font-size: 0.82rem; white-space: nowrap; }
+</style>
+</head>
+<body>
+<nav><div id="nav">
+  <a href="#s0">The idea</a><a href="#s1">1 · Propagation</a><a href="#s2">2 · Catch order</a><a href="#s3">3 · finally</a>
+  <a href="#s4">4 · Rethrow</a><a href="#s5">5 · when</a><a href="#s6">6 · Custom</a><a href="#s7">Guidelines</a><a href="#s8">Your code</a><a href="#s9">Quiz</a>
+</div></nav>
+
+<main>
+<p class="eyebrow">Based on Microsoft's .NET documentation and C# language reference</p>
+<h1>Exceptions in C#, hands on</h1>
+<p class="lead">Each chapter explains one idea and lets you operate it. Chapter 4 is built around the <code>ThrowExVersion</code> and <code>ThrowVersion</code>
+  methods from your own <code>ExceptionHandling.cs</code>, and near the end there's a review of that file. Words with a dotted underline have a definition:
+  hover, tap or focus them.</p>
+
+<!-- ============ 0 ============ -->
+<section id="s0">
+  <p class="eyebrow">The idea</p>
+  <h2>An exception is an object that travels up the call stack</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>When something goes wrong deep inside a method, that method usually can't decide what to do about it. A file helper doesn't know whether a missing
+    file should show an error dialog, retry, or crash the request. So instead of returning an error code that every caller has to check, it <em>throws</em> an
+    object describing the problem. That object travels back up the chain of callers until one of them says "I know how to handle this".</p>
+    <p>Along the way it carries a record of where it came from: the <dfn data-k="stacktrace">stack trace</dfn>. Most of the subtle rules in this page are really
+    about protecting that record.</p>
+  </div>
+  <div class="rule">
+    <div class="s"><b>throw: start the journey</b>
+      <p>Exceptions are created by using the <code>throw</code> keyword, and they're objects whose types all ultimately derive from <code>System.Exception</code>.</p></div>
+    <div class="k"><b>try / catch / finally: meet it</b>
+      <p><code>try</code> marks code that might fail, <code>catch</code> handles a failure when that's reasonable, and <code>finally</code> cleans up resources afterwards.</p></div>
+  </div>
+  <p>One sentence to remember: <b>the stack trace begins where the exception is thrown and ends where it's caught</b>, and every rule about rethrowing
+  exists to keep the beginning of that list intact.</p>
+</section>
+
+<!-- ============ 1 ============ -->
+<section id="s1">
+  <p class="eyebrow">Chapter 1 · propagation</p>
+  <h2>Who catches it, and which finally blocks run on the way?</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>The runtime looks for a matching <code>catch</code> starting in the method that threw, then in its caller, then in that method's caller, and so on.
+    The first compatible handler wins; control continues after that <code>catch</code>, and the methods in between never resume. Microsoft also notes that
+    before the <code>catch</code> block runs, the runtime runs the <code>finally</code> blocks in between. Configure each method and press Throw.</p>
+  </div>
+  <div class="w" id="w1">
+    <h3>Build a call stack and throw from the bottom</h3>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">WriteFile throws</span><div class="seg" id="w1type"></div></div>
+    <div class="stackcol" id="w1stack"></div>
+    <div class="row"><button class="primary" id="w1go">Throw</button><button id="w1reset">Reset view</button></div>
+    <div class="verdict idle" id="w1v">Set up the catch and finally options, then throw.</div>
+    <ul class="log" id="w1log"></ul>
+  </div>
+  <p class="doc"><b>Docs:</b> if the throwing statement isn't inside a <code>try</code> with a matching <code>catch</code>, the runtime checks the calling method, and keeps going up the
+  call stack until it finds a compatible <code>catch</code>. After that block runs, control passes to the next statement after it. If no handler exists anywhere, the program stops with an error message.</p>
+</section>
+
+<!-- ============ 2 ============ -->
+<section id="s2">
+  <p class="eyebrow">Chapter 2 · catch order</p>
+  <h2>First match wins, so specific goes first</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>A <code>try</code> can have several <code>catch</code> clauses. The runtime checks them top to bottom and runs at most one. Because exception types form an
+    <dfn data-k="hierarchy">inheritance hierarchy</dfn>, a clause for a base type also matches every derived type. Put a general clause above a specific one and the specific
+    one could never run, so the compiler refuses. Rearrange the clauses and see.</p>
+  </div>
+  <div class="w" id="w2">
+    <h3>Order the clauses, pick what's thrown</h3>
+<pre>try { /* throws the selected exception */ }</pre>
+    <div class="catches" id="w2list"></div>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">thrown</span><div class="seg" id="w2thrown"></div></div>
+    <div class="verdict idle" id="w2v"></div>
+  </div>
+  <details><summary>The hierarchy used here</summary>
+<pre>Exception
+├── SystemException
+│   ├── IOException
+│   │   ├── FileNotFoundException
+│   │   └── DirectoryNotFoundException
+│   └── ArgumentException
+│       └── ArgumentNullException</pre>
+    <p>Microsoft's own example puts <code>DirectoryNotFoundException</code> and <code>FileNotFoundException</code> first and <code>IOException</code> last, with the comments
+    "Put the more specific exceptions first" and "Put the least specific exception last".</p></details>
+</section>
+
+<!-- ============ 3 ============ -->
+<section id="s3">
+  <p class="eyebrow">Chapter 3 · finally</p>
+  <h2>The block that always runs</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>Cleanup code has a problem: if you put it at the end of the <code>try</code>, an exception skips it; if you copy it into every <code>catch</code>, sooner or later
+    one copy gets out of date. <code>finally</code> runs whether the <code>try</code> succeeded, failed and was caught, failed and wasn't caught here, or even
+    <code>return</code>ed early. Pick a scenario and watch the order of events.</p>
+  </div>
+  <div class="w" id="w3">
+    <h3>Pick a scenario</h3>
+    <div class="row"><div class="seg" id="w3pick"></div></div>
+    <div class="pair">
+      <div class="pane"><h4>Code</h4><div class="lines" id="w3code"></div></div>
+      <div class="pane"><h4>Output, in order</h4><ul class="log" id="w3out" style="margin-top:0"></ul></div>
+    </div>
+    <div class="verdict idle" id="w3v"></div>
+  </div>
+  <p class="doc"><b>Docs:</b> a <code>finally</code> block runs last, after the <code>try</code> and any matched <code>catch</code>, and always runs, whether or not an exception is thrown or a matching
+  <code>catch</code> is found. A <code>try</code> needs at least one <code>catch</code> or a <code>finally</code>; a bare <code>try</code> is a compile error. In practice,
+  <code>using</code> statements are the usual way to get a <code>finally</code> that disposes something.</p>
+</section>
+
+<!-- ============ 4 ============ -->
+<section id="s4">
+  <p class="eyebrow">Chapter 4 · the stack trace</p>
+  <h2>throw; versus throw ex; versus wrapping</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>This is the part your code is about. Sometimes a <code>catch</code> block does a bit of work, like logging, and then realises it can't really handle the problem,
+    so it passes the exception on. How you pass it on decides whether the person debugging later can see <em>where it really happened</em>.</p>
+    <p>Microsoft's wording: if you rethrow by naming the exception, as in <code>throw e</code>, the stack trace is restarted at the current method, and the list of method calls
+    between the original thrower and the current method is lost. Choose a version below and read the stack trace <code>Main</code> prints.</p>
+  </div>
+  <div class="w" id="w4">
+    <h3>Same exception, four ways to pass it on</h3>
+    <div class="row"><div class="seg" id="w4pick"></div></div>
+    <div class="pair">
+      <div class="pane"><h4>ExceptionHandling.cs</h4><div class="lines" id="w4code"></div></div>
+      <div class="pane"><h4>Program.cs</h4><div class="lines" id="w4main"></div></div>
+    </div>
+    <div class="row"><button class="primary" id="w4run">Run and print e.ToString()</button></div>
+    <div class="trace" id="w4trace"></div>
+    <div id="w4warn"></div>
+    <div class="verdict idle" id="w4v">Press Run.</div>
+  </div>
+  <p class="sub">Frame lists are simplified: no line numbers or file paths, and the exact text varies by .NET version.</p>
+  <table class="ref">
+    <tr><th>Write</th><th>Stack trace</th><th>Use it when</th></tr>
+    <tr><td>throw;</td><td>Preserved</td><td>You're inside the <code>catch</code> and want to pass the same exception on. The default choice.</td></tr>
+    <tr><td>throw ex;</td><td>Restarted here; inner frames lost</td><td>Practically never. Analyzer rule CA2200 warns about it.</td></tr>
+    <tr><td>throw new X(msg, ex);</td><td>New trace, original kept in <code>InnerException</code></td><td>You want to add context or change the type, as long as the inner exception doesn't expose private data.</td></tr>
+    <tr><td>ExceptionDispatchInfo<br>.Capture(ex).Throw()</td><td>Preserved and extended</td><td>You must rethrow later, outside the <code>catch</code> block.</td></tr>
+  </table>
+</section>
+
+<!-- ============ 5 ============ -->
+<section id="s5">
+  <p class="eyebrow">Chapter 5 · exception filters</p>
+  <h2>catch … when: decide before catching</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>A common anti-pattern is catching an exception, inspecting it, and doing <code>throw;</code> if it wasn't the one you wanted. An exception filter does the inspection
+    <em>before</em> catching: if the condition is false, the clause simply doesn't match and the search continues. Microsoft points out that the filter is evaluated before
+    the stack is unwound, so the original call stack and local variables are still intact, and a false filter leaves the stack trace untouched.</p>
+  </div>
+  <div class="w" id="w5">
+    <h3>Microsoft's file example: which clause runs?</h3>
+    <div class="lines" id="w5code"></div>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">filePath</span><div class="seg" id="w5path"></div></div>
+    <div class="row"><label style="display:inline-flex;gap:6px;align-items:center;font-size:.9rem"><input type="checkbox" id="w5boom"> make <code>IsNetworkPath</code> throw</label></div>
+    <div class="verdict idle" id="w5v"></div>
+  </div>
+  <details><summary>The logging trick, and its rule</summary>
+<pre>catch (Exception e) when (LogException(e))   <span class="c">// LogException always returns false</span>
+{
+}</pre>
+    <p>Microsoft shows a filter that logs and returns <code>false</code>: the exception is recorded with its full stack while the clause never actually catches it. The rule that comes with filters:
+    don't throw from them. An exception inside a filter is swallowed and the filter counts as <code>false</code>, which is very hard to debug. Try the checkbox above.</p></details>
+</section>
+
+<!-- ============ 6 ============ -->
+<section id="s6">
+  <p class="eyebrow">Chapter 6 · your own exception types</p>
+  <h2>Custom exceptions, the Microsoft way</h2>
+  <div class="mentor"><b class="who">Mentor</b>
+    <p>First check whether a built-in type already says what you mean: <code>ArgumentException</code> for bad arguments, <code>InvalidOperationException</code> when the object is in the wrong
+    state. Create your own only when callers need to catch your situation specifically, or when you need extra properties. Tick the boxes to design one and the checker
+    applies Microsoft's guidelines.</p>
+  </div>
+  <div class="w" id="w6">
+    <h3>Design an exception for "age below the minimum"</h3>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">name</span><div class="seg" id="w6name"></div></div>
+    <div class="row"><span class="mono" style="font-size:.85rem;color:var(--muted)">derives from</span><div class="seg" id="w6base"></div></div>
+    <div class="checks" id="w6ctors"></div>
+    <pre id="w6code"></pre>
+    <ul class="lint" id="w6lint"></ul>
+  </div>
+</section>
+
+<!-- ============ 7 ============ -->
+<section id="s7">
+  <p class="eyebrow">Guidelines</p>
+  <h2>The rules Microsoft spells out</h2>
+  <details open><summary>When to use exceptions at all</summary>
+    <ul>
+      <li>Throwing or handling an exception costs significant resources and time, so throw only for truly extraordinary conditions, not for predictable events or flow control.</li>
+      <li>Don't throw an exception if user input is invalid: users will occasionally type nonsense, so offer a retry instead. For parsing, that's the <code>TryParse</code> pattern.</li>
+      <li>Don't throw when a return code is sufficient, and don't routinely catch an exception, ignore it and carry on.</li>
+    </ul></details>
+  <details><summary>Catching</summary>
+    <ul>
+      <li>Don't catch an exception unless you can handle it and leave the application in a known state.</li>
+      <li>If you catch <code>System.Exception</code>, rethrow it with <code>throw</code> at the end of the <code>catch</code> block. Avoid catching it at all except in top-level handlers.</li>
+      <li>Callers should be able to assume there are no side effects when a method throws: restore state, like undoing the withdrawal when a transfer's deposit fails.</li>
+      <li>Don't log the same exception at every level as it's rethrown; it clutters logs, and the exception already carries its stack trace.</li>
+    </ul></details>
+  <details><summary>Throwing</summary>
+    <ul>
+      <li>Prefer the most specific predefined type, and set <code>ParamName</code> on argument exceptions. The <code>nameof(age)</code> in your Task 6 does exactly that.</li>
+      <li>Use static throw helpers where they exist, such as <code>ArgumentNullException.ThrowIfNull</code>.</li>
+      <li>Don't raise exceptions in <code>finally</code> clauses or from exception filters.</li>
+      <li>In <code>async</code> methods, validate arguments before the asynchronous part. Exceptions thrown later are stored in the task and only surface when it's awaited.</li>
+      <li>In iterators, an exception only reaches the caller when the iterator advances to that point.</li>
+    </ul></details>
+  <details><summary>Types you shouldn't throw yourself</summary>
+    <table class="ref">
+      <tr><th>Type</th><th>Why</th></tr>
+      <tr><td>Exception, SystemException</td><td>Too general for callers to handle meaningfully.</td></tr>
+      <tr><td>ApplicationException</td><td>Don't throw it or derive from it.</td></tr>
+      <tr><td>NullReferenceException<br>IndexOutOfRangeException<br>AccessViolationException</td><td>Reserved for the runtime and usually signal a bug. Public APIs should check arguments so these never escape.</td></tr>
+      <tr><td>StackOverflowException</td><td>Only the CLR throws it, and you shouldn't catch it either.</td></tr>
+    </table></details>
+</section>
+
+<!-- ============ 8 ============ -->
+<section id="s8">
+  <p class="eyebrow">Your code</p>
+  <h2>Review of ExceptionHandling.cs</h2>
+  <p class="sub">Green is good as is, yellow is worth knowing, red is likely to cost points. Check each against its test before changing anything: the tests decide what the task wants.</p>
+  <div class="review" id="review"></div>
+</section>
+
+<!-- ============ 9 ============ -->
+<section id="s9">
+  <p class="eyebrow">Check yourself</p>
+  <h2>Quiz</h2>
+  <p class="sub">Answer before clicking. <span class="score" id="score"></span></p>
+  <div id="quiz"></div>
+  <div class="row"><button id="qreset">Reset quiz</button></div>
+</section>
+
+<footer>
+  <p>Based on Microsoft Learn:</p>
+  <ul>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/exceptions/">Exceptions and exception handling (C#)</a>,
+      <a href="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/exceptions/exception-handling">Exception handling</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/csharp/fundamentals/exceptions/using-exceptions">Use exceptions</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/statements/exception-handling-statements">Exception-handling statements (C# reference)</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/keywords/when">when (C# reference)</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/standard/exceptions/best-practices-for-exceptions">Best practices for exceptions</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/api/system.exception?view=net-10.0">Exception class</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/api/system.runtime.exceptionservices.exceptiondispatchinfo.throw?view=net-8.0">ExceptionDispatchInfo.Throw</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/quality-rules/ca2200">CA2200: Rethrow to preserve stack details</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/fundamentals/code-analysis/suppress-warnings">Suppress code analysis warnings</a></li>
+    <li><a href="https://learn.microsoft.com/en-us/dotnet/standard/exceptions/how-to-create-user-defined-exceptions">How to create user-defined exceptions</a>,
+      <a href="https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/using-standard-exception-types">Using standard exception types</a> and
+      <a href="https://learn.microsoft.com/en-us/dotnet/standard/design-guidelines/exception-throwing">Exception throwing</a></li>
+  </ul>
+  <p>The interactive parts and explanations are original. Chapter 5 adapts Microsoft's <code>HandleFileOperations</code> example.</p>
+</footer>
+</main>
+<div id="tip" role="tooltip"></div>
+
+<script>
+(() => {
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const wait = ms => new Promise(r => setTimeout(r, ms));
+  function verdict(n, kind, html) { n.className = 'verdict ' + kind; n.innerHTML = html; }
+  function seg(host, opts, value, on) {
+    host.innerHTML = '';
+    opts.forEach(o => { const b = el('button', '', esc(o.label)); b.type = 'button'; b.setAttribute('aria-pressed', String(o.value === value)); b.onclick = () => on(o.value); host.append(b); });
+  }
+  function log(ul, html, cls) { const li = el('li', cls || '', html); ul.append(li); ul.scrollTop = ul.scrollHeight; }
+  const lines = (host, arr, on) => { host.innerHTML = ''; arr.forEach((t, k) => host.append(el('div', on && on.includes(k) ? 'on' : '', esc(t) || ' '))); };
+
+  // exception hierarchy
+  const PARENT = { SystemException: 'Exception', IOException: 'SystemException', FileNotFoundException: 'IOException',
+    DirectoryNotFoundException: 'IOException', ArgumentException: 'SystemException', ArgumentNullException: 'ArgumentException',
+    InvalidOperationException: 'SystemException' };
+  const isA = (t, base) => { while (t) { if (t === base) return true; t = PARENT[t]; } return false; };
+
+  // ---------- glossary ----------
+  const G = {
+    stacktrace: ['Stack trace', 'The list of method calls from where the exception was thrown up to where it was caught. Stored in Exception.StackTrace.'],
+    callstack: ['Call stack', 'The chain of methods currently running: Main called A, A called B, and so on.'],
+    unwind: ['Unwinding', 'Leaving methods one by one, from the thrower up to the handler, abandoning their remaining code and running their finally blocks.'],
+    hierarchy: ['Exception hierarchy', 'Exception types inherit from each other. FileNotFoundException is an IOException, which is an Exception, so catch (IOException) also catches it.'],
+    inner: ['InnerException', 'A property holding the exception that caused this one, so wrapping an exception keeps the original and its stack trace.'],
+    analyzer: ['Code analyzer', 'A tool built into the .NET SDK that inspects your code during the build and reports rule violations such as CA2200 as warnings.'],
+    filter: ['Exception filter', 'A when (condition) on a catch clause. The clause only handles the exception if the condition is true.']
+  };
+  const tip = $('#tip');
+  function showTip(d) {
+    const g = G[d.dataset.k]; if (!g) return;
+    tip.innerHTML = `<b>${esc(g[0])}</b>${esc(g[1])}`;
+    const r = d.getBoundingClientRect(), tw = tip.offsetWidth, th = tip.offsetHeight;
+    let x = r.left + scrollX + r.width / 2 - tw / 2;
+    x = Math.max(8 + scrollX, Math.min(x, scrollX + document.documentElement.clientWidth - tw - 8));
+    let y = r.top + scrollY - th - 8; if (r.top - th - 8 < 50) y = r.bottom + scrollY + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px'; tip.classList.add('show');
+  }
+  const hideTip = () => { tip.classList.remove('show'); tip.style.left = '0px'; tip.style.top = '0px'; };
+  function bindTips(root = document) { $$('dfn', root).forEach(d => { if (d.dataset.b) return; d.dataset.b = 1; d.tabIndex = 0;
+    d.addEventListener('mouseenter', () => showTip(d)); d.addEventListener('mouseleave', hideTip);
+    d.addEventListener('focus', () => showTip(d)); d.addEventListener('blur', hideTip);
+    d.addEventListener('click', e => { e.stopPropagation(); showTip(d); }); }); }
+  bindTips(); document.addEventListener('click', hideTip); addEventListener('scroll', hideTip, { passive: true });
+
+  // ---------- nav ----------
+  const links = $$('#nav a');
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) links.forEach(a => a.classList.toggle('on', a.getAttribute('href') === '#' + e.target.id)); }), { rootMargin: '-45% 0px -50% 0px' });
+  $$('main section').forEach(s => io.observe(s));
+
+  // ---------- widget 1: propagation ----------
+  (() => {
+    const FR = [
+      { name: 'Main()', c: 'Exception', f: false },
+      { name: 'ProcessOrder()', c: 'none', f: true },
+      { name: 'SaveOrder()', c: 'ArgumentException', f: true },
+      { name: 'WriteFile()', c: 'none', f: false, thrower: true }
+    ];
+    const CATCH = ['none', 'FileNotFoundException', 'IOException', 'ArgumentException', 'Exception'];
+    let thrown = 'FileNotFoundException', busy = false;
+    const logUl = $('#w1log');
+    function draw() {
+      seg($('#w1type'), ['FileNotFoundException', 'IOException', 'ArgumentNullException', 'InvalidOperationException'].map(t => ({ value: t, label: t })), thrown, v => { if (!busy) { thrown = v; draw(); } });
+      const host = $('#w1stack'); host.innerHTML = '';
+      FR.forEach((f, i) => {
+        const d = el('div', 'frame' + (f.thrower ? ' thrower' : '')); d.dataset.i = i;
+        const head = el('div', 'fhead');
+        head.append(el('span', 'fname', (i ? '↳ '.padStart(i * 2 + 2, ' ') : '') + esc(f.name)));
+        const opts = el('div', 'fopts');
+        const sel = el('select'); CATCH.forEach(c => { const o = el('option', '', c === 'none' ? 'no try/catch' : `catch (${c})`); o.value = c; if (c === f.c) o.selected = true; sel.append(o); });
+        sel.onchange = () => { f.c = sel.value; };
+        const lab = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = f.f; cb.onchange = () => { f.f = cb.checked; }; lab.append(cb, document.createTextNode('finally'));
+        opts.append(sel, lab); head.append(opts); d.append(head);
+        d.append(el('div', 'tagline', f.thrower ? `throws new ${thrown}(...)` : (i === 0 ? 'entry point' : `calls ${FR[i + 1].name}`)));
+        host.append(d);
+      });
+    }
+    const frameEl = i => $(`#w1stack .frame[data-i="${i}"]`);
+    function clearView() { $$('#w1stack .frame').forEach(x => x.classList.remove('search', 'miss', 'hit', 'fin', 'gone', 'crash')); }
+    $('#w1go').onclick = async () => {
+      if (busy) return; busy = true; clearView(); logUl.innerHTML = '';
+      $$('#w1stack select, #w1stack input').forEach(x => x.disabled = true);
+      const bottom = FR.length - 1;
+      frameEl(bottom).querySelector('.tagline').innerHTML = `throws new ${thrown}(...)  <span class="bolt">thrown</span>`;
+      log(logUl, `<span class="who">throw</span>${thrown} thrown in ${FR[bottom].name}`, 'bad');
+      await wait(600);
+      // pass 1: search for handler
+      let handler = -1;
+      for (let i = bottom; i >= 0; i--) {
+        frameEl(i).classList.add('search'); await wait(550);
+        const c = FR[i].c;
+        if (c !== 'none' && isA(thrown, c)) { handler = i; frameEl(i).classList.remove('search'); frameEl(i).classList.add('hit');
+          log(logUl, `<span class="who">search</span>${FR[i].name}: catch (${c}) matches, because ${thrown === c ? 'it is the same type' : `${thrown} derives from ${c}`}`, 'ok'); break; }
+        frameEl(i).classList.remove('search'); frameEl(i).classList.add('miss');
+        log(logUl, `<span class="who">search</span>${FR[i].name}: ${c === 'none' ? 'no catch here' : `catch (${c}) doesn't match ${thrown}`}`);
+      }
+      if (handler < 0) {
+        $$('#w1stack .frame').forEach(x => x.classList.add('crash'));
+        log(logUl, '<span class="who">result</span>No handler anywhere: the program stops with an unhandled-exception error.', 'bad');
+        verdict($('#w1v'), 'bad', `<span class="tag bad">unhandled</span>Nothing catches <code>${thrown}</code>, so the program stops with an error message. Don't count on <code>finally</code> blocks for anything important in this case; only handled exceptions guarantee an orderly unwind.`);
+        busy = false; $$('#w1stack select, #w1stack input').forEach(x => x.disabled = false); return;
+      }
+      // pass 2: unwind
+      await wait(400);
+      for (let i = bottom; i > handler; i--) {
+        if (FR[i].f) { frameEl(i).classList.add('fin'); log(logUl, `<span class="who">unwind</span>${FR[i].name}: its finally block runs`); await wait(600); }
+        frameEl(i).classList.remove('fin', 'miss'); frameEl(i).classList.add('gone');
+        log(logUl, `<span class="who">unwind</span>${FR[i].name} is abandoned: the rest of its code never runs`);
+        await wait(350);
+      }
+      log(logUl, `<span class="who">catch</span>${FR[handler].name}: the catch block runs`, 'ok'); await wait(500);
+      if (FR[handler].f) { frameEl(handler).classList.add('fin'); log(logUl, `<span class="who">finally</span>${FR[handler].name}: its finally block runs after the catch`); await wait(500); }
+      log(logUl, `<span class="who">continue</span>${FR[handler].name} carries on with the statement after its try/catch`, 'ok');
+      const skipped = bottom - handler;
+      verdict($('#w1v'), 'ok', `<span class="tag ok">handled</span>Caught in <code>${FR[handler].name}</code>. ${skipped ? `${skipped} method${skipped > 1 ? 's were' : ' was'} <dfn data-k="unwind">unwound</dfn> on the way: their remaining code was skipped, but any finally blocks they had ran first.` : 'It was caught in the method that threw it.'} Methods above the handler never noticed anything happened.`);
+      bindTips($('#w1v'));
+      busy = false; $$('#w1stack select, #w1stack input').forEach(x => x.disabled = false);
+    };
+    $('#w1reset').onclick = () => { if (!busy) { draw(); logUl.innerHTML = ''; verdict($('#w1v'), 'idle', 'Set up the catch and finally options, then throw.'); } };
+    draw();
+  })();
+
+  // ---------- widget 2: catch order ----------
+  (() => {
+    const TYPES = ['FileNotFoundException', 'IOException', 'Exception', 'ArgumentException'];
+    let order = ['FileNotFoundException', 'IOException', 'Exception'], thrown = 'FileNotFoundException';
+    function render() {
+      const host = $('#w2list'); host.innerHTML = '';
+      // compile check: clause j unreachable if earlier clause i is base of (or same as) j
+      let dead = -1, by = -1;
+      for (let j = 0; j < order.length && dead < 0; j++) for (let i = 0; i < j; i++) if (isA(order[j], order[i])) { dead = j; by = i; break; }
+      const runs = dead >= 0 ? -1 : order.findIndex(t => isA(thrown, t));
+      order.forEach((t, k) => {
+        const row = el('div', 'cl' + (k === dead ? ' dead' : k === runs ? ' run' : ''));
+        row.append(document.createTextNode(`catch (`));
+        const sel = el('select'); TYPES.forEach(x => { const o = el('option', '', x); o.value = x; if (x === t) o.selected = true; sel.append(o); });
+        sel.onchange = () => { order[k] = sel.value; render(); };
+        row.append(sel, document.createTextNode(`)  { Console.WriteLine("${k + 1}"); }`));
+        const up = el('button', '', '↑'); up.disabled = k === 0; up.title = 'Move up';
+        up.onclick = () => { [order[k - 1], order[k]] = [order[k], order[k - 1]]; render(); };
+        const dn = el('button', '', '↓'); dn.disabled = k === order.length - 1; dn.title = 'Move down';
+        dn.onclick = () => { [order[k + 1], order[k]] = [order[k], order[k + 1]]; render(); };
+        [up, dn].forEach(b => { b.style.padding = '2px 8px'; row.append(b); });
+        host.append(row);
+      });
+      seg($('#w2thrown'), ['FileNotFoundException', 'IOException', 'ArgumentNullException', 'InvalidOperationException'].map(x => ({ value: x, label: x })), thrown, v => { thrown = v; render(); });
+      if (dead >= 0) verdict($('#w2v'), 'bad', `<span class="tag bad">compile error CS0160</span>Clause ${dead + 1}, <code>catch (${order[dead]})</code>, can never run: clause ${by + 1}, <code>catch (${order[by]})</code>, already catches ${order[dead] === order[by] ? 'that same type' : `every ${order[dead]}, because ${order[dead]} derives from ${order[by]}`}. Move the more specific clause up.`);
+      else if (runs < 0) verdict($('#w2v'), 'bad', `<span class="tag bad">not caught here</span>No clause matches <code>${thrown}</code>, so it continues up the call stack to the caller.`);
+      else {
+        const skipped = order.slice(runs + 1).filter(t => isA(thrown, t));
+        verdict($('#w2v'), 'ok', `<span class="tag ok">prints ${runs + 1}</span><code>catch (${order[runs]})</code> is the first clause that matches <code>${thrown}</code>.${skipped.length ? ` ${skipped.map(s => `<code>catch (${s})</code>`).join(' and ')} would also match, but at most one catch block runs.` : ''}`);
+      }
+    }
+    render();
+  })();
+
+  // ---------- widget 3: finally ----------
+  (() => {
+    const S = {
+      ok: { label: 'No exception', code: ['try', '{', '    Console.WriteLine("work");', '}', 'catch (IOException)', '{', '    Console.WriteLine("handled");', '}', 'finally', '{', '    Console.WriteLine("cleanup");', '}', 'Console.WriteLine("after");'],
+        out: [['work', [2]], ['cleanup', [10]], ['after', [12]]], say: 'The try finishes, the catch is skipped, finally runs, then the code after the statement.' },
+      caught: { label: 'Thrown and caught', code: ['try', '{', '    throw new IOException();', '    Console.WriteLine("never");', '}', 'catch (IOException)', '{', '    Console.WriteLine("handled");', '}', 'finally', '{', '    Console.WriteLine("cleanup");', '}', 'Console.WriteLine("after");'],
+        out: [['handled', [7]], ['cleanup', [11]], ['after', [13]]], say: 'The rest of the try is skipped, the matching catch runs, then finally, then execution continues normally.' },
+      uncaught: { label: 'Thrown, not caught here', code: ['try', '{', '    throw new ArgumentException();', '}', 'catch (IOException)', '{', '    Console.WriteLine("handled");', '}', 'finally', '{', '    Console.WriteLine("cleanup");', '}', 'Console.WriteLine("after");'],
+        out: [['cleanup', [10]], ['…exception continues to the caller', [], 'bad']], say: 'No clause matches, but finally still runs before the exception leaves this method. "after" is never printed.' },
+      ret: { label: 'return inside try', code: ['static int Get()', '{', '    try', '    {', '        Console.WriteLine("work");', '        return 42;', '    }', '    finally', '    {', '        Console.WriteLine("cleanup");', '    }', '}'],
+        out: [['work', [4]], ['cleanup', [9]], ['Get() returns 42', [5], 'ok']], say: 'The return value is decided at return 42, but the method only actually returns after finally has run.' },
+      incatch: { label: 'Exception inside catch', code: ['try', '{', '    throw new IOException();', '}', 'catch (IOException)', '{', '    Console.WriteLine("handling");', '    throw new InvalidOperationException();', '}', 'finally', '{', '    Console.WriteLine("cleanup");', '}'],
+        out: [['handling', [6]], ['cleanup', [11]], ['…InvalidOperationException continues to the caller', [], 'bad']], say: 'A new exception thrown inside the catch doesn\'t stop finally from running. A catch only handles exceptions from its own try block, not from a sibling catch.' }
+    };
+    let pick = 'ok', token = 0;
+    async function render() {
+      const my = ++token;
+      seg($('#w3pick'), Object.keys(S).map(k => ({ value: k, label: S[k].label })), pick, v => { pick = v; render(); });
+      const s = S[pick]; lines($('#w3code'), s.code); const out = $('#w3out'); out.innerHTML = '';
+      verdict($('#w3v'), 'idle', 'Running…');
+      for (const [t, hl, cls] of s.out) {
+        await wait(550); if (my !== token) return;
+        lines($('#w3code'), s.code, hl); log(out, esc(t), cls);
+      }
+      verdict($('#w3v'), 'ok', s.say);
+    }
+    render();
+  })();
+
+  // ---------- widget 4: rethrow ----------
+  (() => {
+    const NS = 'CSharpBasics.Core.ExceptionHandling';
+    const V = {
+      bare: { label: 'throw;', method: 'ThrowVersion',
+        code: ['public static void ThrowVersion()', '{', '    try', '    {', '        ThrowExceptionSource();', '    }', '    catch (InvalidOperationException)', '    {', '        Console.WriteLine("Caught, rethrowing with \'throw;\'");', '        throw;', '    }', '}'], hl: [9],
+        trace: [['head', 'System.InvalidOperationException: Original source exception.'], ['', `   at ${NS}.ThrowExceptionSource()`], ['', `   at ${NS}.ThrowVersion()`], ['', '   at Program.Main()']],
+        say: '<span class="tag ok">preserved</span>The first frame is still <code>ThrowExceptionSource</code>, where the exception really started. Someone reading this log goes straight to the right method.' },
+      ex: { label: 'throw ex;', method: 'ThrowExVersion',
+        code: ['public static void ThrowExVersion()', '{', '    try', '    {', '        ThrowExceptionSource();', '    }', '    catch (InvalidOperationException ex)', '    {', '        Console.WriteLine("Caught, rethrowing with \'throw ex;\'");', '        throw ex;', '    }', '}'], hl: [9],
+        trace: [['head', 'System.InvalidOperationException: Original source exception.'], ['lost', `   at ${NS}.ThrowExceptionSource()`], ['', `   at ${NS}.ThrowExVersion()`], ['', '   at Program.Main()']],
+        warn: '<span class="tag bad">CA2200</span><span>The build reports <b>warning CA2200: Rethrow to preserve stack details</b>. It\'s one of the <dfn data-k="analyzer">analyzer</dfn> rules enabled by default since .NET 5.</span>',
+        say: '<span class="tag bad">reset</span>Same exception object, same message, but the trace now <em>starts</em> at <code>ThrowExVersion</code>. <code>ThrowExceptionSource</code> is gone, so the log points at the method that merely passed the problem on. With a deeper call chain, every frame between the thrower and this catch would vanish.' },
+      wrap: { label: 'throw new …(msg, ex)', method: 'ThrowWrapVersion',
+        code: ['public static void ThrowWrapVersion()', '{', '    try', '    {', '        ThrowExceptionSource();', '    }', '    catch (InvalidOperationException ex)', '    {', '        throw new InvalidOperationException(', '            "Saving the order failed.", ex);', '    }', '}'], hl: [8, 9],
+        trace: [['head', 'System.InvalidOperationException: Saving the order failed.'], ['inner', ' ---> System.InvalidOperationException: Original source exception.'], ['inner', `   at ${NS}.ThrowExceptionSource()`], ['inner', `   at ${NS}.ThrowWrapVersion()`], ['inner', '   --- End of inner exception stack trace ---'], ['', `   at ${NS}.ThrowWrapVersion()`], ['', '   at Program.Main()']],
+        say: '<span class="tag ok">kept inside</span>The new exception has its own short trace, but the original travels along in <dfn data-k="inner">InnerException</dfn> with its full trace. You gain a message with context; the cost is that callers must look one level down to find the real cause.' },
+      edi: { label: 'ExceptionDispatchInfo', method: 'ThrowLaterVersion',
+        code: ['public static void ThrowLaterVersion()', '{', '    ExceptionDispatchInfo? edi = null;', '    try', '    {', '        ThrowExceptionSource();', '    }', '    catch (InvalidOperationException ex)', '    {', '        edi = ExceptionDispatchInfo.Capture(ex);', '    }', '    Console.WriteLine("doing other work first");', '    edi?.Throw();   // outside the catch block', '}'], hl: [9, 12],
+        trace: [['head', 'System.InvalidOperationException: Original source exception.'], ['', `   at ${NS}.ThrowExceptionSource()`], ['', `   at ${NS}.ThrowLaterVersion()`], ['mark', '--- End of stack trace from previous location ---'], ['', `   at ${NS}.ThrowLaterVersion()`], ['', '   at Program.Main()']],
+        say: '<span class="tag ok">preserved and extended</span>Use this when you have to rethrow <em>outside</em> the catch block, where plain <code>throw;</code> isn\'t allowed. <code>Capture</code> saves the state; <code>Throw</code> restores it and inserts a marker where the rethrow happened. It lives in <code>System.Runtime.ExceptionServices</code>.' }
+    };
+    let pick = 'ex', token = 0;
+    function render() {
+      seg($('#w4pick'), Object.keys(V).map(k => ({ value: k, label: V[k].label })), pick, v => { pick = v; render(); });
+      const v = V[pick]; lines($('#w4code'), v.code, v.hl);
+      lines($('#w4main'), ['try', '{', `    ExceptionHandling.${v.method}();`, '}', 'catch (InvalidOperationException e)', '{', '    Console.WriteLine(e.ToString());', '}']);
+      $('#w4trace').innerHTML = ''; $('#w4warn').innerHTML = v.warn ? `<div class="warn">${v.warn}</div>` : ''; bindTips($('#w4warn'));
+      verdict($('#w4v'), 'idle', 'Press Run.');
+    }
+    $('#w4run').onclick = async () => {
+      const my = ++token, v = V[pick], t = $('#w4trace'); t.innerHTML = '';
+      for (const [cls, txt] of v.trace) { await wait(320); if (my !== token) return; t.append(el('div', cls, esc(txt))); }
+      verdict($('#w4v'), pick === 'ex' ? 'bad' : 'ok', v.say); bindTips($('#w4v'));
+    };
+    render();
+  })();
+
+  // ---------- widget 5: filters ----------
+  (() => {
+    const CODE = ['try', '{', '    ProcessFile(filePath);', '}', 'catch (IOException ex) when (ex.Message.Contains("access denied"))', '{', '    Console.WriteLine("File access denied. Check permissions.");', '}',
+      'catch (IOException ex) when (ex.Message.Contains("not found"))', '{', '    Console.WriteLine("File not found. Verify the path.");', '}',
+      'catch (IOException ex) when (IsNetworkPath(filePath))', '{', '    Console.WriteLine($"Network file operation failed: {ex.Message}");', '}', 'catch (IOException)', '{', '    Console.WriteLine("Other I/O error occurred.");', '}'];
+    const P = { denied: { label: '"report-denied.txt"', msg: 'File access denied', net: false }, missing: { label: '"missing.txt"', msg: 'File not found', net: false },
+      net: { label: '"\\\\server\\share\\a.txt"', msg: 'Network timeout occurred', net: true }, other: { label: '"disk-full.txt"', msg: 'Disk is full', net: false } };
+    let pick = 'denied';
+    function render() {
+      seg($('#w5path'), Object.keys(P).map(k => ({ value: k, label: P[k].label })), pick, v => { pick = v; render(); });
+      const p = P[pick], boom = $('#w5boom').checked;
+      const msg = p.msg.toLowerCase();
+      const steps = [];
+      let hit = -1;
+      const c1 = msg.includes('access denied'); steps.push(`filter 1: Message contains "access denied"? <b>${c1}</b>`); if (c1) hit = 4;
+      if (hit < 0) { const c2 = msg.includes('not found'); steps.push(`filter 2: Message contains "not found"? <b>${c2}</b>`); if (c2) hit = 8; }
+      if (hit < 0) {
+        if (boom) steps.push('filter 3: IsNetworkPath threw an exception, which is swallowed and treated as <b>false</b>');
+        else { steps.push(`filter 3: IsNetworkPath(filePath)? <b>${p.net}</b>`); if (p.net) hit = 12; }
+      }
+      if (hit < 0) { steps.push('clause 4: no filter, matches any IOException'); hit = 16; }
+      lines($('#w5code'), CODE, [hit, hit + 2]);
+      const out = { 4: 'File access denied. Check permissions.', 8: 'File not found. Verify the path.', 12: `Network file operation failed: ${p.msg}`, 16: 'Other I/O error occurred.' }[hit];
+      verdict($('#w5v'), boom && pick === 'net' ? 'bad' : 'ok', `<span class="tag ${boom && pick === 'net' ? 'bad' : 'ok'}">prints</span><code>${esc(out)}</code><br>` + steps.map(s => `· ${s}`).join('<br>') +
+        (boom && pick === 'net' ? '<br>The network path was treated as an ordinary I/O error, and nothing tells you the filter itself crashed. That\'s why Microsoft says not to throw from exception filters.' : '<br>Each false filter just lets the search continue; the exception was never caught and rethrown, so its stack trace is untouched.'));
+    }
+    $('#w5boom').onchange = render;
+    render();
+  })();
+
+  // ---------- widget 6: custom exception ----------
+  (() => {
+    let name = 'InvalidAgeException', base = 'Exception';
+    const ctors = { none: true, msg: true, inner: true, prop: false };
+    const CT = [['none', 'parameterless constructor'], ['msg', 'constructor taking a message'], ['inner', 'constructor taking a message and an inner exception'], ['prop', 'an extra <code>Age</code> property with its own constructor']];
+    const host = $('#w6ctors');
+    CT.forEach(([k, t]) => { const l = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = ctors[k]; cb.onchange = () => { ctors[k] = cb.checked; render(); }; l.append(cb); l.insertAdjacentHTML('beforeend', ' ' + t); host.append(l); });
+    function render() {
+      seg($('#w6name'), ['InvalidAgeException', 'InvalidAge', 'AgeError'].map(x => ({ value: x, label: x })), name, v => { name = v; render(); });
+      seg($('#w6base'), ['Exception', 'ApplicationException', 'SystemException'].map(x => ({ value: x, label: x })), base, v => { base = v; render(); });
+      const b = [`public class ${name} : ${base}`, '{'];
+      if (ctors.prop) b.push('    public int Age { get; }', '');
+      if (ctors.none) b.push(`    public ${name}() { }`, '');
+      if (ctors.msg) b.push(`    public ${name}(string message)`, '        : base(message) { }', '');
+      if (ctors.inner) b.push(`    public ${name}(string message, Exception inner)`, '        : base(message, inner) { }', '');
+      if (ctors.prop) b.push(`    public ${name}(string message, int age)`, '        : this(message) => Age = age;', '');
+      if (b[b.length - 1] === '') b.pop();
+      b.push('}');
+      $('#w6code').textContent = b.join('\n');
+      const L = [];
+      L.push(name.endsWith('Exception') ? ['ok', 'The name ends with "Exception", as Microsoft recommends.'] : ['bad', `Rename it to end with "Exception", for example <code>${name.replace(/Error$/, '')}Exception</code>.`]);
+      L.push(base === 'Exception' ? ['ok', 'Derives from <code>Exception</code>.'] : base === 'ApplicationException' ? ['bad', 'Don\'t derive from <code>ApplicationException</code>: Microsoft\'s design guidelines say not to throw it or derive from it. Older articles recommended it; that advice is outdated.'] : ['bad', '<code>SystemException</code> is meant for exceptions from the runtime and framework. Derive from <code>Exception</code>.']);
+      const three = ctors.none && ctors.msg && ctors.inner;
+      L.push(three ? ['ok', 'Has the three common constructors.'] : ['bad', `Missing ${['none', 'msg', 'inner'].filter(k => !ctors[k]).map(k => ({ none: 'the parameterless', msg: 'the message', inner: 'the message + inner exception' })[k] + ' constructor').join(', ')}. Microsoft says to include at least these three; the inner-exception one is what makes wrapping possible.`]);
+      if (ctors.prop) L.push(['ok', 'An extra property carries data a handler can use, the way <code>ArgumentException.ParamName</code> does.']);
+      L.push(['ok', 'Before writing one, ask whether <code>ArgumentOutOfRangeException</code> already says this. For an age below a minimum, it usually does.']);
+      $('#w6lint').innerHTML = L.map(([c, t]) => `<li class="${c}">${t}</li>`).join('');
+    }
+    render();
+  })();
+
+  // ---------- review ----------
+  (() => {
+    const R = [
+      ['good', 'Tasks 1, 3 and 5: correct', '<p>Each catches the specific exception the task names, and Task 5 shows <code>finally</code> running after the catch.</p><p>Worth knowing for the exam: only <em>integer</em> division by zero throws <code>DivideByZeroException</code>. With <code>double</code>, <code>1.0 / 0</code> gives infinity and throws nothing.</p>'],
+      ['note', 'Task 2: one input isn\'t handled', '<p>You catch <code>FormatException</code> and <code>OverflowException</code>, which is good. But <code>int.Parse(null)</code> throws <code>ArgumentNullException</code>, which neither clause catches. Check whether a test passes <code>null</code>.</p><p>In real code you\'d use <code>int.TryParse</code> here: Microsoft\'s guidance is not to throw exceptions for invalid user input.</p>'],
+      ['note', 'Tasks 3 and 4: fine for the task, not a pattern to copy', '<p>The task asks you to catch <code>IndexOutOfRangeException</code> and <code>NullReferenceException</code>, so your code is right for it. In normal code, those two are reserved for the runtime and usually mean a bug; Microsoft\'s guidelines say to check arguments so they never happen, for example <code>if (input is null) { ... }</code>.</p>'],
+      ['note', 'Task 6: "custom exception" may mean a custom type', '<p>You throw a built-in <code>ArgumentException</code>, with <code>nameof(age)</code> setting <code>ParamName</code>, which is good practice. But the comment says <em>custom</em> exception handling. Look at the test: if it expects a type of its own, create one using Chapter 6. If a built-in type is enough, <code>ArgumentOutOfRangeException</code> is more precise than <code>ArgumentException</code>, since Microsoft says to prefer the most derived type.</p>'],
+      ['note', 'Task 7: Console.ReadLine in a library method', '<p>Under a test runner there\'s usually no keyboard input, so <code>ReadLine()</code> returns <code>null</code>, your <code>?? string.Empty</code> turns that into <code>""</code>, and <code>int.Parse("")</code> lands in the <code>FormatException</code> clause. That works, but run it once yourself to be sure it doesn\'t wait for input. The final <code>catch (Exception ex)</code> is the kind of broad catch Microsoft advises against outside top-level handlers; it\'s acceptable here because the task asks for multiple catch blocks.</p>'],
+      ['fix', 'Task 8a: throw ex; triggers CA2200, which can cost Quality points', '<p>The task requires <code>throw ex;</code>, so don\'t change it to <code>throw;</code>. But the build will report <b>CA2200</b> on that line. Microsoft documents how to suppress a warning deliberately, with a reason, using a preprocessor directive:</p><pre>catch (InvalidOperationException ex)\n{\n    Console.WriteLine("Caught, rethrowing with \'throw ex;\'");\n#pragma warning disable CA2200 // Intentional: this task demonstrates the stack trace reset\n    throw ex;\n#pragma warning restore CA2200\n}</pre><p>Run <code>dotnet build</code> before and after to confirm the warning disappears. I can\'t tell whether Autocode\'s Quality stage counts suppressed warnings, so check its feedback after a submission.</p>'],
+      ['good', 'Task 8b: correct', '<p><code>throw;</code> with no variable preserves the original stack trace. Not declaring <code>ex</code> in the catch also avoids an unused-variable warning.</p>']
+    ];
+    $('#review').innerHTML = R.map(([c, h, b]) => `<div class="rcard ${c}"><h4>${h}</h4>${b}</div>`).join('');
+  })();
+
+  // ---------- quiz ----------
+  (() => {
+    const Q = [
+      { p: 'What does throw ex; do to the exception\'s stack trace?', o: ['Preserves it', 'Restarts it at the current method, losing the frames below', 'Clears it completely', 'Appends a second copy'], a: 1,
+        w: 'Naming the exception in the throw statement restarts the trace at the current method; the calls between the original thrower and here are lost.' },
+      { p: 'Which keeps the original stack trace when rethrowing inside a catch block?', o: ['throw ex;', 'throw;', 'throw new Exception(ex.Message);', 'return ex;'], a: 1, w: 'throw; with no expression is the recommended way to rethrow; it preserves all call stack information.' },
+      { p: 'Does this compile?', code: 'try { Work(); }\ncatch (Exception) { }\ncatch (IOException) { }', o: ['Yes', 'No'], a: 1,
+        w: 'IOException derives from Exception, so the second clause can never run: error CS0160. Put specific types first.' },
+      { p: 'What does this print?', code: 'static int Get()\n{\n    try { return 1; }\n    finally { Console.WriteLine("F"); }\n}\nConsole.WriteLine(Get());', o: ['1', 'F then 1', '1 then F', 'It does not compile'], a: 1,
+        w: 'finally runs before the method actually returns, so "F" is printed first, then Main prints the returned 1.' },
+      { p: 'A filter expression in catch (...) when (...) throws an exception. What happens?', o: ['The new exception propagates', 'The program crashes', 'It is swallowed and the filter counts as false', 'The catch block runs anyway'], a: 2,
+        w: 'The CLR catches it and the filter returns false, indistinguishable from an ordinary false, which is why you shouldn\'t throw from filters.' },
+      { p: 'You need to rethrow an exception later, after the catch block has ended. What preserves its stack trace?', o: ['throw; after the catch', 'throw ex;', 'ExceptionDispatchInfo.Capture(ex) in the catch, then .Throw() later', 'It can\'t be done'], a: 2,
+        w: 'throw; is only allowed inside a catch block. ExceptionDispatchInfo captures the state and restores it when rethrowing.' },
+      { p: 'Which exception should your own public method throw when a parameter is null?', o: ['NullReferenceException', 'ArgumentNullException', 'Exception', 'ApplicationException'], a: 1,
+        w: 'NullReferenceException is reserved for the runtime. Throw ArgumentNullException, for example with ArgumentNullException.ThrowIfNull(arg).' },
+      { p: 'How many catch blocks can run for one thrown exception in a single try statement?', o: ['All matching ones', 'At most one', 'Exactly two', 'None, only finally'], a: 1, w: 'The runtime checks clauses top to bottom and runs at most one.' },
+      { p: 'What does this print?', code: 'try\n{\n    int z = 0;\n    Console.WriteLine(10 / z);\n}\ncatch (ArithmeticException) { Console.WriteLine("A"); }\ncatch (Exception) { Console.WriteLine("E"); }', o: ['A', 'E', 'A then E', 'Infinity'], a: 0,
+        w: 'DivideByZeroException derives from ArithmeticException, so the first clause matches. Integer division by zero throws; double division would give infinity.' },
+      { p: 'Which three constructors does Microsoft recommend for a custom exception?', o: ['(), (string message), (string message, Exception inner)', '(int code), (string message), ()', '(Exception inner) only', '(string message) only'], a: 0,
+        w: 'Parameterless, message, and message plus inner exception. The last one is what lets callers wrap your exception without losing the cause.' },
+      { p: 'Is a try block with only a finally (no catch) valid?', o: ['Yes', 'No, a catch is always required'], a: 0, w: 'A try needs one or more catch blocks, or a finally, or both. A try with neither is a compile error.' },
+      { p: 'Why prefer int.TryParse over int.Parse in a try/catch for user input?', o: ['TryParse is the only one that supports cultures', 'Invalid user input is expected, and exceptions are for exceptional conditions and cost more', 'Parse is obsolete', 'TryParse handles null by throwing'], a: 1,
+        w: 'Microsoft says not to throw for invalid user input and notes that throwing and handling exceptions is expensive. The Try pattern returns false instead.' }
+    ];
+    const host = $('#quiz'); let right = 0, done = 0;
+    const score = () => $('#score').textContent = done ? `Score: ${right} of ${done} answered (${Q.length} total).` : '';
+    function build() {
+      host.innerHTML = ''; right = 0; done = 0; score();
+      Q.forEach((q, qi) => {
+        const box = el('div', 'q'); box.append(el('div', 'prompt', `${qi + 1}. ${esc(q.p)}`));
+        if (q.code) box.append(el('pre', '', esc(q.code)));
+        const opts = el('div', 'opts'), fb = el('div', 'fb');
+        q.o.forEach((t, k) => { const b = el('button', '', esc(t)); b.onclick = () => {
+          $$('button', opts).forEach(x => x.disabled = true);
+          const ok = k === q.a; done++; if (ok) right++;
+          b.classList.add(ok ? 'right' : 'wrong'); opts.children[q.a].classList.add('right');
+          fb.innerHTML = `<span class="tag ${ok ? 'ok' : 'bad'}">${ok ? 'Right' : 'Not quite'}</span>${esc(q.w)}`; score();
+        }; opts.append(b); });
+        box.append(opts, fb); host.append(box);
+      });
+    }
+    $('#qreset').onclick = build; build();
+  })();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug current .cs file",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build file",
+      "program": "${fileDirname}/out/${fileBasenameNoExtension}.dll",
+      "cwd": "${fileDirname}",
+      "console": "integratedTerminal"
+    }
+  ]
+}
